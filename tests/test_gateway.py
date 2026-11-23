@@ -1,4 +1,5 @@
 import pytest
+from fastapi.testclient import TestClient
 
 from charvi_api.auth import UserIdentity, get_current_user
 from charvi_api.gateway import (
@@ -9,7 +10,6 @@ from charvi_api.gateway import (
 )
 from charvi_api.main import app
 from charvi_api.policy import ActionCategory, ActionRequest
-from fastapi.testclient import TestClient
 
 
 @pytest.fixture
@@ -133,7 +133,6 @@ def test_http_evaluation_endpoint_never_executes_action(client: TestClient) -> N
     assert response.json()["approval_required"] is True
     assert response.json()["execution_performed"] is False
     assert response.json()["actor_id"] == "00000000-0000-4000-8000-000000000001"
-
 
 
 def test_pending_database_approval_is_not_execution_authority() -> None:
