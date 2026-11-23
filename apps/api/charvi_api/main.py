@@ -103,7 +103,7 @@ app = FastAPI(
 
 allowed_origins = [
     origin.strip()
-    for origin in os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:3000").split(",")
+    for origin in AgentSettings().cors_allowed_origins.split(",")
     if origin.strip()
 ]
 app.add_middleware(
