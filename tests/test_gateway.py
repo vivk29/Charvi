@@ -48,6 +48,9 @@ def test_exact_unexpired_approval_binding_allows_policy_gated_action() -> None:
 def test_changed_payload_invalidates_approval() -> None:
     request = make_request()
     approval = ApprovalBinding(
+        approval_id="approval-payload",
+        approval_nonce="nonce-payload",
+        status="approved",
         workspace_id="workspace-1",
         actor_id="agent-1",
         payload_sha256=payload_digest(request),
