@@ -1,14 +1,11 @@
+from charvi_api.main import app
 from fastapi.testclient import TestClient
 
-from charvi_api.main import app
 
 client = TestClient(app)
 
 
-def test_health_is_live() -> None:
+def test_health_endpoint() -> None:
     response = client.get("/health")
     assert response.status_code == 200
-    assert response.json() == {
-        "status": "ok",
-        "service": "charvi-control-plane",
-    }
+    assert response.json() == {"status": "ok", "service": "charvi-control-plane"}
