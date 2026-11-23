@@ -9,6 +9,8 @@ services:
         required: false
     environment:
       APP_ENV: development
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     read_only: true
     tmpfs:
       - /tmp:size=64m,noexec,nosuid
