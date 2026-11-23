@@ -11,6 +11,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class AgentSettings(BaseSettings):
+    coordinator_provider: str = "ollama"
+    ollama_base_url: str = ""
+    ollama_model: str = ""
+    ollama_api_key: str = ""
     openai_api_key: str = ""
     openai_model: str = ""
     openai_base_url: str = "https://api.openai.com/v1"
@@ -170,7 +174,7 @@ class BrowserUseSDKBackend:
 
 
 class OpenAIResponsesBackend:
-    """OpenAI Responses API adapter used as Charvi's coordinator model."""
+    """Optional OpenAI Responses API coordinator; not required by Charvi."""
 
     agent_id = "openai"
     capabilities = ("reasoning", "planning", "writing", "coding", "analysis")
@@ -246,8 +250,6 @@ def build_agent_registry(settings: AgentSettings | None = None) -> dict[str, Age
             auth_header="X-Session-API-Key",
             timeout_seconds=300.0,
         )
-    # Register Browser Use as a read-only specialist. Its SDK and browser runtime are
-    # loaded lazily, so Charvi's base API remains lightweight.
     registry["browser_use"] = BrowserUseSDKBackend(settings)
     return registry
 
@@ -287,8 +289,6 @@ def route_specialists(
         if candidates:
             selected.append(candidates[0])
     if not selected:
-        # A specialist miss must not silently send a coding or workflow task to a
-        # browser worker. Hermes may provide a non-executing general fallback.
         fallback = "hermes" if "hermes" in registry else None
         if fallback:
             selected.append(fallback)
