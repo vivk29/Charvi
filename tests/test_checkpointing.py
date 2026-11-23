@@ -47,3 +47,21 @@ def test_catalog_reports_durable_checkpointing_only_when_saver_is_supplied() -> 
     )
     langgraph = next(item for item in orchestrator.catalog() if item["id"] == "langgraph")
     assert langgraph["durable_checkpointing"] is True
+
+
+def test_same_thread_retains_bounded_conversation_history() -> None:
+    memory_module = pytest.importorskip("langgraph.checkpoint.memory")
+    checkpointer = memory_module.InMemorySaver()
+    orchestrator = CharviOrchestrator(AgentSettings(), checkpointer=checkpointer)
+
+    async def scenario():
+        await orchestrator.run(task="First question", thread_id="shared-thread")
+        await orchestrator.run(task="Follow-up question", thread_id="shared-thread")
+        return await orchestrator.get_thread_history(thread_id="shared-thread")
+
+    history = asyncio.run(scenario())
+    assert [message["role"] for message in history] == [
+        "user", "assistant", "user", "assistant"
+    ]
+    assert "First question" in history[0]["content"]
+    assert "Follow-up question" in history[2]["content"]
