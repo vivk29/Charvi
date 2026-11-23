@@ -1,29 +1,36 @@
-# Workspace ownership and approval API
+# Charvi Agent Integration
 
-The API now verifies a Supabase Auth bearer token, derives the actor ID from the verified identity, and checks that the actor owns a workspace before accessing its approvals.
+Charvi exposes one assistant surface and delegates work to configured specialist runtimes.
 
-## End-user flow
+## Connected runtime design
 
-- Charvi performs low-impact read and draft work without creating an approval request.
-- For a policy-gated action, Charvi creates a pending approval bound to the exact request digest, workspace, requester and expiry.
-- The owner can list pending requests, inspect the audit events, and approve, reject or cancel a request.
-- Decisions are recorded by the database trigger in `approval_decision_events`.
-- A decision is not an execution event. No external action is executed by these endpoints.
+- OpenAI Responses API: coordinating model; synthesizes specialist output into Charvi's final response.
+- Hermes Agent: general-purpose assistant, research and automation specialist through its OpenAI-compatible API server.
+- OpenClaw Gateway: browser, device and automation specialist through its OpenAI-compatible HTTP endpoint.
+- OpenHands: optional coding specialist endpoint. A deployment-specific adapter is required; setting a URL alone does not install or start OpenHands.
+- Browser Use: optional browser specialist endpoint. Deploy and secure the service before configuring its URL.
 
-## Routes
+Hermes and OpenClaw expose compatible chat-completions endpoints. Charvi uses a shared adapter for those runtimes and the OpenAI Responses API for its coordinator.
 
-- `GET /v1/workspaces`
-- `GET /v1/workspaces/{workspace_id}/approvals`
-- `POST /v1/workspaces/{workspace_id}/approvals`
-- `POST /v1/approvals/{approval_id}/decision`
-- `GET /v1/approvals/{approval_id}/events`
+## Environment
 
-## Server configuration
+Copy .env.example into a private .env file and set endpoints and credentials. Do not commit real values. Use private service networking or authenticated TLS; do not expose Hermes or OpenClaw gateways publicly without hardened ingress.
 
-Set `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` in the API's private environment. The service-role key is server-only and must never be committed or exposed to clients. `.env.example` contains placeholders only.
+## API
 
-The service-role credential bypasses RLS, so the API explicitly filters workspaces by both the requested workspace ID and the verified owner's user ID. Keep the credential restricted to this API process.
+- GET /v1/agents reports configured adapters and capabilities without returning credentials.
+- POST /v1/agent-runs routes a user request to a specialist and optionally synthesizes the result with OpenAI.
 
-## Important limitations
+Example request body:
+{
+  "workspace_id": "YOUR_WORKSPACE_UUID",
+  "task": "Research the latest GST changes and prepare a short summary"
+}
 
-This milestone does not implement action execution, a user-facing approval inbox, workspace creation, workspace membership/invitations, notifications, or deployment. The existing single-owner workspace model is enforced. Approval decisions only update the approval record and audit trail.
+## Security boundary
+
+Specialist runtimes are untrusted workers. They receive only the task and context explicitly passed to them. They do not receive Supabase service credentials, owner tokens, or permission to execute side effects through this integration. Any real-world action must return through Charvi's own policy and execution gateway. This integration produces plans, analysis and drafts; it is not an autonomous browser, shell, payment or device execution service.
+
+## Important status
+
+Adapters and routing code are in the repository. They are not live until each runtime is deployed, reachable over a private authenticated network, and configured with credentials. OpenAI also needs an API key and a model enabled for the API project.
