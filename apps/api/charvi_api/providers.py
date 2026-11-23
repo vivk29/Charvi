@@ -112,7 +112,7 @@ class OpenAICompatibleCoordinatorBackend:
                             },
                             {
                                 "role": "user",
-                                "content": f"User request:\\n{task}\\n\\nSpecialist results and context:\\n{context}",
+                                "content": f"User request:\n{task}\n\nSpecialist results and context:\n{context}",
                             },
                         ],
                     },
@@ -121,7 +121,7 @@ class OpenAICompatibleCoordinatorBackend:
                 data = response.json()
             message = data["choices"][0]["message"]["content"]
             if isinstance(message, list):
-                message = "\\n".join(
+                message = "\n".join(
                     part.get("text", "")
                     for part in message
                     if isinstance(part, dict) and isinstance(part.get("text"), str)
