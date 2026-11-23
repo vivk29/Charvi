@@ -50,6 +50,10 @@ To opt into OpenAI instead, set COORDINATOR_PROVIDER=openai, OPENAI_API_KEY and 
 - OPENHANDS_BASE_URL should point to the OpenHands Agent Server API base path. OpenHands can run terminal and file tools in its workspace, so OPENHANDS_ENABLED defaults to false. Enable only after its workspace is container-isolated and tasks are dispatched with approval bound to the exact task digest.
 - BROWSER_USE_WORKER_URL and BROWSER_USE_WORKER_TOKEN connect the API to the isolated Browser Use worker. Keep BROWSER_USE_ENABLED=false until the worker is deployed with a separate browser-worker.env, no Charvi database secrets, no authenticated browser profile, and verified network/browser isolation.
 
+## Browser dashboard connectivity
+
+The Next.js owner console calls this API with the signed-in user's Supabase access token. Set `CORS_ALLOWED_ORIGINS` to a comma-separated allowlist containing the exact deployed web origin(s); the default is `http://localhost:3000`. Do not use a wildcard origin. The API does not enable credentialed cross-origin cookies; requests use bearer tokens.
+
 ## API
 
 - GET /v1/agents lists configured runtimes, orchestration and the selected coordinator provider.
