@@ -1,5 +1,4 @@
-from datetime import UTC, datetime, timedelta
-from uuid import UUID
+from datetime import UTC, datetime
 
 import pytest
 from fastapi.testclient import TestClient
