@@ -36,6 +36,9 @@ class AgentSettings(BaseSettings):
     browser_use_timeout_seconds: int = 150
     kokoro_tts_url: str = ""
     kokoro_tts_timeout_seconds: int = 60
+    whisper_worker_url: str = ""
+    whisper_worker_token: str = ""
+    whisper_worker_timeout_seconds: int = 180
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
