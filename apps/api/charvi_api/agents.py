@@ -233,7 +233,7 @@ def build_agent_registry(settings: AgentSettings | None = None) -> dict[str, Age
         registry["openclaw"] = OpenAICompatibleBackend(
             agent_id="openclaw", base_url=settings.openclaw_base_url,
             api_token=settings.openclaw_api_token, model=settings.openclaw_model,
-            capabilities=("device", "general"),
+            capabilities=("device",),
             execution_capable=True,
         )
     if settings.openhands_enabled and settings.openhands_base_url and settings.openhands_api_token:
