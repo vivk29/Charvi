@@ -53,7 +53,11 @@ To opt into OpenAI instead, set COORDINATOR_PROVIDER=openai, OPENAI_API_KEY and 
 ## API
 
 - GET /v1/agents lists configured runtimes, orchestration and the selected coordinator provider.
-- POST /v1/agent-runs routes a request through the workforce.
+- POST /v1/agent-runs routes a request through the workforce, stores a durable run record and returns a thread_id.
+- GET /v1/workspaces/{workspace_id}/agent-runs lists the owner's run history.
+- GET /v1/agent-runs/{run_id} retrieves an owner-scoped run record.
+- POST /v1/agent-runs/{run_id}/resume resumes pending graph work from the last saved checkpoint.
+- Reuse the returned thread_id on later requests to continue a thread. Checkpoint IDs are internally namespaced by verified user and workspace.
 - OpenHands code execution requires an approved non-reversible write approval; OpenClaw device control requires an approved non-reversible device_control approval. Both approvals must include the SHA-256 digest of the exact task and context. Pass the approval ID as approval_id; changing either string invalidates the approval.
 
 Example read-only research request:
@@ -64,6 +68,14 @@ Example read-only research request:
   "task": "Research the official documentation for LangGraph persistence and summarise it"
 }
 ```
+
+## Durable memory and recovery
+
+Set LANGGRAPH_POSTGRES_URI to a server-only Supabase Postgres direct connection string or session-pooler connection string. Do not use the transaction pooler for this long-lived checkpoint connection. The API connects with the search path set to the non-exposed charvi_memory schema. The schema is locked to the database owner; default privileges are revoked from PUBLIC, anon, authenticated and service_role. LangGraph checkpoint tables have RLS enabled as an additional boundary.
+
+The API initializes the official LangGraph AsyncPostgresSaver at startup. If the connection is configured but cannot be initialized, startup fails closed rather than silently falling back to volatile memory. If no URI is configured, Charvi still records agent runs in Supabase but the LangGraph catalog reports durable_checkpointing=false and interrupted runs cannot be resumed.
+
+Checkpointing is short-term, thread-scoped workflow memory, not a long-term personal profile store. Run history is stored separately in public.agent_runs. Approval-bound code/device execution is deliberately excluded from automatic resume; it requires a fresh approval. The API hashes user, workspace and client thread ID together before passing a thread ID to LangGraph, preventing cross-workspace thread collisions.
 
 ## Security boundary
 
