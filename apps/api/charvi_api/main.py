@@ -322,7 +322,7 @@ async def save_memory(
     store: Store,
 ) -> dict[str, object]:
     await owned_workspace(store, workspace_id, user)
-    if not is_safe_memory_content(payload.title + "\\n" + payload.content):
+    if not is_safe_memory_content(payload.title + " " + payload.content):
         raise HTTPException(
             status_code=422,
             detail="Memory cannot contain obvious passwords, API keys or access tokens.",
