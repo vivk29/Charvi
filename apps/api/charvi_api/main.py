@@ -246,6 +246,7 @@ async def run_agent_task(
 ) -> dict[str, object]:
     await owned_workspace(store, payload.workspace_id, user)
     allow_code_execution = False
+    allow_device_control = False
     if payload.approval_id is not None:
         approval = await store.get_approval(str(payload.approval_id))
         if approval is None or approval.get("workspace_id") != str(payload.workspace_id):
@@ -256,10 +257,11 @@ async def run_agent_task(
         if expiry and datetime.fromisoformat(expiry) <= datetime.now(UTC):
             raise HTTPException(status_code=409, detail="Execution approval has expired.")
         approved_payload = approval.get("payload") or {}
-        if approval.get("action_category") != ActionCategory.WRITE.value:
-            raise HTTPException(status_code=409, detail="Approval is not a workspace-write approval.")
+        action_category = approval.get("action_category")
+        if action_category not in {ActionCategory.WRITE.value, ActionCategory.DEVICE_CONTROL.value}:
+            raise HTTPException(status_code=409, detail="Approval category cannot authorize an agent runtime.")
         if approved_payload.get("reversible") is not False:
-            raise HTTPException(status_code=409, detail="OpenHands requires an explicitly non-reversible execution approval.")
+            raise HTTPException(status_code=409, detail="Agent execution requires an explicitly non-reversible approval.")
         execution_digest = hashlib.sha256(
             f"{payload.task}\0{payload.context}".encode()
         ).hexdigest()
@@ -268,18 +270,25 @@ async def run_agent_task(
                 status_code=409,
                 detail="Approval does not match this exact task and context. Create a new approval for the revised request.",
             )
-        allow_code_execution = True
+        allow_code_execution = action_category == ActionCategory.WRITE.value
+        allow_device_control = action_category == ActionCategory.DEVICE_CONTROL.value
 
     result = await orchestrator.run(
         task=payload.task,
         context=payload.context,
         allow_code_execution=allow_code_execution,
+        allow_device_control=allow_device_control,
     )
     openhands_invoked = any(
         item.agent_id == "openhands" and item.status == "completed"
         for item in result.specialists
     )
+    openclaw_invoked = any(
+        item.agent_id == "openclaw" and item.status == "completed"
+        for item in result.specialists
+    )
     code_execution_performed: bool | None = None if openhands_invoked else False
+    device_control_performed: bool | None = None if openclaw_invoked else False
     return {
         "status": result.status,
         "routed_to": list(result.routed_to),
@@ -302,5 +311,7 @@ async def run_agent_task(
         "openhands_runtime_invoked": openhands_invoked,
         "code_execution_possible": openhands_invoked,
         "code_execution_performed": code_execution_performed,
-        "external_side_effects_performed": False,
+        "device_control_runtime_invoked": openclaw_invoked,
+        "device_control_performed": device_control_performed,
+        "external_side_effects_performed": None if openclaw_invoked else False,
     }
