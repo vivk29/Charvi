@@ -7,7 +7,7 @@ Charvi is a voice-and-text personal AI operating system with one conversational 
 - **Charvi Core:** understands the owner's request, plans work, routes tasks to specialists and presents one coherent response.
 - **Control plane:** Python 3.12 + FastAPI. Owns identity, workspace access, action policy, approvals, audit events and task routing.
 - **Assistant runtime:** Hermes Agent, planned as an isolated runtime. Hermes is not the authorization authority.
-- **Specialist agents:** OpenHands for approval-gated coding, Browser Use in a separate read-only browser worker, Hermes for general work, and OpenClaw as an optional isolated device/automation runtime. n8n is a planned workflow executor.
+- **Specialist agents:** OpenHands for approval-gated coding, Browser Use in a separate read-only browser worker, Hermes for general work, and OpenClaw as an optional isolated device runtime with owner approval required for device control. n8n is a planned workflow executor.
 - **Data plane:** Supabase PostgreSQL/Auth. RLS protects tenant data; privileged operations are restricted to trusted backend services.
 - **Devices:** cloud-first; laptop worker connects outbound over authenticated TLS and receives narrowly scoped jobs.
 - **Clients:** web and mobile, with text and voice interaction.
