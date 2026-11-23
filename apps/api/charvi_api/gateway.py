@@ -5,7 +5,7 @@ Approval evidence must be loaded from the trusted control-plane store in a later
 integration; until then, high-impact actions remain blocked.
 """
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 from hashlib import sha256
 
@@ -25,6 +25,7 @@ class GatewayRequest:
     actor_id: str
     action: ActionRequest
     idempotency_key: str
+    payload: dict[str, object] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,6 +60,7 @@ def payload_digest(request: GatewayRequest) -> str:
         "description": request.action.description,
         "reversible": request.action.reversible,
         "idempotency_key": request.idempotency_key,
+        "execution_payload": request.payload,
     }
     encoded = json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode()
     return sha256(encoded).hexdigest()
