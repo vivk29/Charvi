@@ -457,6 +457,27 @@ async def list_agent_runs(
     return await store.list_agent_runs(str(workspace_id))
 
 
+@app.get(
+    "/v1/workspaces/{workspace_id}/threads/{thread_id}/history",
+    tags=["agents"],
+)
+async def get_thread_history(
+    workspace_id: UUID,
+    thread_id: UUID,
+    user: CurrentUser,
+    store: Store,
+    orchestrator: Orchestrator,
+) -> list[dict[str, str]]:
+    await owned_workspace(store, workspace_id, user)
+    internal_thread_id = checkpoint_thread_key(
+        user.user_id, str(workspace_id), str(thread_id)
+    )
+    try:
+        return await orchestrator.get_thread_history(thread_id=internal_thread_id)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
 @app.get("/v1/agent-runs/{run_id}", tags=["agents"])
 async def get_agent_run(
     run_id: UUID,
