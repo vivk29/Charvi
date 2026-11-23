@@ -7,7 +7,7 @@ export default async function Home() {
 
   if (supabase) {
     const { data } = await supabase.auth.getClaims();
-    if (typeof data.claims?.email === "string") {
+    if (typeof data?.claims?.email === "string") {
       initialEmail = data.claims.email;
     }
   }
