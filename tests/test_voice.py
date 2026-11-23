@@ -25,3 +25,11 @@ def test_voice_endpoint_requires_authenticated_owner() -> None:
         json={"text": "Hello from Charvi", "voice": "af_heart"},
     )
     assert response.status_code == 401
+
+def test_private_transcription_endpoint_requires_authenticated_owner() -> None:
+    response = TestClient(app).post(
+        "/v1/voice/transcribe",
+        files={"file": ("recording.webm", b"fake audio", "audio/webm;codecs=opus")},
+        data={"language": "en"},
+    )
+    assert response.status_code == 401
