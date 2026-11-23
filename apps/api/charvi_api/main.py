@@ -214,7 +214,8 @@ async def transcribe_voice(
         "audio/webm", "audio/ogg", "audio/wav", "audio/x-wav",
         "audio/mpeg", "audio/mp4", "audio/aac", "audio/flac",
     }
-    if file.content_type not in allowed_types:
+    media_type = (file.content_type or "").split(";", maxsplit=1)[0].lower()
+    if media_type not in allowed_types:
         raise HTTPException(status_code=415, detail="Unsupported audio format.")
     content = await file.read(20 * 1024 * 1024 + 1)
     if not content:
@@ -232,7 +233,7 @@ async def transcribe_voice(
                     "file": (
                         file.filename or "charvi-recording.webm",
                         content,
-                        file.content_type,
+                        media_type,
                     )
                 },
                 data={"language": language or ""},
