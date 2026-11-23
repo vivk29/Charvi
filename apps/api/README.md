@@ -56,6 +56,10 @@ Example read-only research request:
 }
 ```
 
+### Approval-bound OpenHands task
+
+For code execution, calculate SHA-256 over the exact UTF-8 task string. Create an approval with `category: "write"`, `reversible: false`, and include the digest as `payload.task_sha256`. After the owner approves it, pass that approval ID with the identical task to `POST /v1/agent-runs`. Any change to the task requires a new approval. OpenHands remains unavailable unless `OPENHANDS_ENABLED=true`, its Agent Server URL and session API key are configured, and the server runs an isolated workspace.
+
 ## Security boundary
 
 Specialist runtimes are untrusted workers. They receive only task/context explicitly passed to them. They do not receive Supabase service credentials, owner tokens, or direct access to Charvi's permission database. External content is untrusted data, not instructions. OpenHands execution is approval-gated; Browser Use is intended for read-only browsing; device, financial, messaging, deployment and destructive actions remain behind Charvi's own policy and approval gateway.
