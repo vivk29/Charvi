@@ -10,14 +10,22 @@ from charvi_api.gateway import (
 )
 from charvi_api.main import app
 from charvi_api.policy import ActionCategory, ActionRequest
+from charvi_api.store import get_store
 
 
 @pytest.fixture
 def client() -> TestClient:
+    class WorkspaceStore:
+        async def get_workspace(self, workspace_id: str, owner_id: str):
+            if owner_id == "00000000-0000-4000-8000-000000000001":
+                return {"id": workspace_id, "owner_id": owner_id}
+            return None
+
     app.dependency_overrides[get_current_user] = lambda: UserIdentity(
         user_id="00000000-0000-4000-8000-000000000001",
         email="owner@example.test",
     )
+    app.dependency_overrides[get_store] = WorkspaceStore
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()
@@ -116,11 +124,17 @@ def test_low_risk_read_can_be_evaluated_without_approval() -> None:
     assert decision.approval_required is False
 
 
-def test_http_evaluation_endpoint_never_executes_action(client: TestClient) -> None:
+def test_reversible_workspace_write_does_not_need_approval() -> None:
+    decision = authorize_gateway_request(make_request(ActionCategory.WRITE), now_epoch=100)
+    assert decision.allowed_to_execute is True
+    assert decision.approval_required is False
+
+
+def test_http_evaluation_endpoint_checks_workspace_and_never_executes_action(client: TestClient) -> None:
     response = client.post(
         "/v1/actions/evaluate",
         json={
-            "workspace_id": "workspace-1",
+            "workspace_id": "00000000-0000-4000-8000-000000000002",
             "category": "financial",
             "target": "payment-destination",
             "description": "Create payment",
@@ -133,6 +147,20 @@ def test_http_evaluation_endpoint_never_executes_action(client: TestClient) -> N
     assert response.json()["approval_required"] is True
     assert response.json()["execution_performed"] is False
     assert response.json()["actor_id"] == "00000000-0000-4000-8000-000000000001"
+
+
+def test_workspace_evaluation_rejects_other_users_workspace(client: TestClient) -> None:
+    response = client.post(
+        "/v1/actions/evaluate",
+        json={
+            "workspace_id": "00000000-0000-4000-8000-000000000003",
+            "category": "read",
+            "target": "notes",
+            "description": "Read notes",
+            "idempotency_key": "task-124",
+        },
+    )
+    assert response.status_code == 404
 
 
 def test_pending_database_approval_is_not_execution_authority() -> None:
