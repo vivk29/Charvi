@@ -34,6 +34,8 @@ class AgentSettings(BaseSettings):
     browser_use_worker_token: str = ""
     browser_use_enabled: bool = False
     browser_use_timeout_seconds: int = 150
+    kokoro_tts_url: str = ""
+    kokoro_tts_timeout_seconds: int = 60
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
