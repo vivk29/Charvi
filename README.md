@@ -7,7 +7,7 @@ Charvi is a voice-and-text personal AI operating system with one conversational 
 - **Charvi Core:** understands the owner's request, plans work, routes tasks to specialists and presents one coherent response.
 - **Control plane:** Python 3.12 + FastAPI. Owns identity, workspace access, action policy, approvals, audit events and task routing.
 - **Assistant runtime:** Hermes Agent, planned as an isolated runtime. Hermes is not the authorization authority.
-- **Specialist agents:** OpenHands for coding, Browser Use for browser work, n8n for workflows, and additional research, finance/business and device specialists as integrations mature.
+- **Specialist agents:** OpenHands for approval-gated coding, Browser Use in a separate read-only browser worker, Hermes for general work, and OpenClaw as an optional isolated device/automation runtime. n8n is a planned workflow executor.
 - **Data plane:** Supabase PostgreSQL/Auth. RLS protects tenant data; privileged operations are restricted to trusted backend services.
 - **Devices:** cloud-first; laptop worker connects outbound over authenticated TLS and receives narrowly scoped jobs.
 - **Clients:** web and mobile, with text and voice interaction.
@@ -82,9 +82,9 @@ Charvi now has a unified agent registry and orchestration API:
 
 - OpenAI Responses API is the coordinating model adapter.
 - Hermes Agent and OpenClaw connect through their OpenAI-compatible chat-completions endpoints.
-- Optional OpenHands and Browser Use integrations can be connected through a secured OpenAI-compatible service bridge; these are not direct native SDK integrations yet.
+- OpenHands connects to its Agent Server using its documented OpenAI-compatible endpoint and session-key authentication; code execution is disabled unless an exact-task-and-context approval is provided. Browser Use uses its native Python SDK inside a separate container, authenticated from the API with a dedicated worker token.
 - The authenticated API exposes GET /v1/agents and POST /v1/agent-runs.
 - Task routing selects specialists by capability, runs selected specialists, and passes their results to OpenAI for synthesis when configured.
 - Specialist responses are treated as untrusted output. They cannot directly execute privileged actions through this integration.
 
-The integration code is committed and GitHub Actions lint and tests pass. The services are not live yet: runtime URLs, private tokens and an OpenAI API key/model must be configured in the API hosting environment. No credentials are stored in this repository.
+The adapters and routing code are committed. LangGraph is optional in the API image; Browser Use is a separate Compose worker (profile `browser`); OpenHands is an authenticated Agent Server adapter. These services are not live until separately deployed and configured. No credentials are stored in this repository.
