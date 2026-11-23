@@ -54,6 +54,10 @@ To opt into OpenAI instead, set COORDINATOR_PROVIDER=openai, OPENAI_API_KEY and 
 
 - GET /v1/agents lists configured runtimes, orchestration and the selected coordinator provider.
 - POST /v1/agent-runs routes a request through the workforce, stores a durable run record and returns a thread_id.
+- POST /v1/workspaces/{workspace_id}/memories explicitly saves an owner-approved memory.
+- GET /v1/workspaces/{workspace_id}/memories lists active saved memories.
+- GET /v1/workspaces/{workspace_id}/memories/search?q=... searches saved memories.
+- POST /v1/workspaces/{workspace_id}/memories/{memory_id}/archive archives a saved memory.
 - GET /v1/workspaces/{workspace_id}/agent-runs lists the owner's run history.
 - GET /v1/workspaces/{workspace_id}/threads/{thread_id}/history retrieves the bounded conversation history for that owner-scoped thread.
 - GET /v1/agent-runs/{run_id} retrieves an owner-scoped run record.
@@ -76,7 +80,7 @@ Set LANGGRAPH_POSTGRES_URI to a server-only Supabase Postgres direct connection 
 
 The API initializes the official LangGraph AsyncPostgresSaver at startup. If the connection is configured but cannot be initialized, startup fails closed rather than silently falling back to volatile memory. If no URI is configured, Charvi still records agent runs in Supabase but the LangGraph catalog reports durable_checkpointing=false and interrupted runs cannot be resumed.
 
-Checkpointing is short-term, thread-scoped workflow memory, not a long-term personal profile store. Run history is stored separately in public.agent_runs. Approval-bound code/device execution is deliberately excluded from automatic resume; it requires a fresh approval. The API hashes user, workspace and client thread ID together before passing a thread ID to LangGraph, preventing cross-workspace thread collisions.
+Checkpointing is short-term, thread-scoped workflow memory. Long-term memories live separately in public.user_memories and are saved only through the explicit owner-controlled memory API; Charvi does not silently promote every conversation into permanent memory. The API searches relevant saved memories for ordinary non-approval-bound tasks and injects them as untrusted reference context. Approval-bound execution skips memory augmentation so the approved task/context digest remains exact. Run history is stored separately in public.agent_runs. Approval-bound code/device execution is deliberately excluded from automatic resume; it requires a fresh approval. The API hashes user, workspace and client thread ID together before passing a thread ID to LangGraph, preventing cross-workspace thread collisions.
 
 ## Security boundary
 
