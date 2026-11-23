@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 from .agents import AgentSettings
 from .auth import UserIdentity, get_current_user
 from .gateway import GatewayRequest, authorize_gateway_request, payload_digest
-from .memory import build_memory_context, is_safe_memory_content
+from .memory import build_memory_context, is_safe_memory_content, normalize_memory_query
 from .orchestrator import CharviOrchestrator
 from .policy import ActionCategory, ActionRequest, evaluate_action
 from .store import SupabaseRestStore, get_store
@@ -316,7 +316,7 @@ async def save_memory(
     store: Store,
 ) -> dict[str, object]:
     await owned_workspace(store, workspace_id, user)
-    if not is_safe_memory_content(payload.content):
+    if not is_safe_memory_content(payload.title + "\\n" + payload.content):
         raise HTTPException(
             status_code=422,
             detail="Memory cannot contain obvious passwords, API keys or access tokens.",
@@ -359,7 +359,10 @@ async def search_saved_memories(
     q: str = Query(min_length=1, max_length=300),
 ) -> list[dict[str, object]]:
     await owned_workspace(store, workspace_id, user)
-    return await store.search_memories(str(workspace_id), user.user_id, q)
+    normalized_query = normalize_memory_query(q)
+    if not normalized_query:
+        return []
+    return await store.search_memories(str(workspace_id), user.user_id, normalized_query)
 
 
 @app.post(
@@ -482,11 +485,12 @@ async def run_agent_task(
 
     run_context = payload.context
     memory_records: list[dict[str, object]] = []
-    if payload.approval_id is None:
+    normalized_task_query = normalize_memory_query(payload.task)
+    if payload.approval_id is None and normalized_task_query:
         memory_records = await store.search_memories(
             str(payload.workspace_id),
             user.user_id,
-            payload.task,
+            normalized_task_query,
             limit=5,
         )
         memory_context = build_memory_context(memory_records)
