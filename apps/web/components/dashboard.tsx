@@ -479,8 +479,8 @@ export function Dashboard({ initialEmail }: { initialEmail: string | null }) {
   recognition.start();
   }
 
-  async function speakLastResponse() {
-    const text = lastResult?.coordinator?.output;
+  async function speakLastResponse(previewText?: string) {
+    const text = previewText || lastResult?.coordinator?.output;
     if (!text) return;
 
     if (voiceLanguage !== "kn-IN") {
@@ -686,6 +686,7 @@ export function Dashboard({ initialEmail }: { initialEmail: string | null }) {
                       <option value="hf_beta">Beta — feminine Hindi</option>
                     </select>
                   </label>
+                  <button className="quiet" type="button" onClick={() => void speakLastResponse("Hello, I'm Charvi. How can I help you today?")}>Preview feminine voice</button>
                   <span className="muted tiny">{availableVoices.length} device voices detected. Kokoro voices are used when the private voice worker is connected; otherwise Charvi selects an available device voice.</span>
                   <span className="muted tiny">{voiceStatus || "Browser speech recognition may use your browser or device speech provider."}</span>
                 </div>
