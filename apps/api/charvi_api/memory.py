@@ -15,6 +15,12 @@ def is_safe_memory_content(content: str) -> bool:
     return _SECRET_LIKE.search(content) is None
 
 
+def normalize_memory_query(query: str) -> str:
+    """Strip web-search operators and keep only plain searchable terms."""
+    terms = re.findall(r"[A-Za-z0-9]+", query)
+    return " ".join(terms[:20])[:200]
+
+
 def build_memory_context(memories: list[dict[str, Any]]) -> str:
     """Render owner-saved facts as untrusted reference data, never instructions."""
     if not memories:
