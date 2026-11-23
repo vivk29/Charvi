@@ -35,7 +35,11 @@ def _merge_history(
     new: list[dict[str, str]] | None,
 ) -> list[dict[str, str]]:
     """Append conversation messages while bounding checkpoint growth."""
-    return ((previous or []) + (new or []))[-40:]
+    messages = (previous or []) + (new or [])
+    return [
+        {"role": message["role"], "content": message["content"][:8000]}
+        for message in messages[-40:]
+    ]
 
 
 class CharviOrchestrator:
