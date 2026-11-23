@@ -73,11 +73,11 @@ async def lifespan(application: FastAPI):
                 "Charvi is refusing to start without its requested durable memory."
             ) from exc
 
-    application.state.orchestrator = CharviOrchestrator(
-        settings,
-        checkpointer=checkpointer,
-    )
     try:
+        application.state.orchestrator = CharviOrchestrator(
+            settings,
+            checkpointer=checkpointer,
+        )
         yield
     finally:
         if connection is not None:
