@@ -4,7 +4,7 @@
 
 LangGraph is Charvi's workflow orchestrator. It is not an LLM and does not replace a model provider. Specialist runtimes (OpenHands, Browser Use, Hermes and optional OpenClaw) are separate from the coordinator model.
 
-Charvi's default coordinator provider is **Ollama**, using its OpenAI-compatible /v1/chat/completions endpoint. This lets the owner run an open-weight model locally without a Claude Pro, Gemini Advanced or ChatGPT subscription. The existing OpenAI Responses adapter remains optional and is selected only when CHARVI_COORDINATOR_PROVIDER=openai.
+Charvi's default coordinator provider is **Ollama**, using its OpenAI-compatible /v1/chat/completions endpoint. This lets the owner run an open-weight model locally without a Claude Pro, Gemini Advanced or ChatGPT subscription. The existing OpenAI Responses adapter remains optional and is selected only when COORDINATOR_PROVIDER=openai.
 
 ## Initial local setup
 
@@ -12,7 +12,7 @@ Charvi's default coordinator provider is **Ollama**, using its OpenAI-compatible
 2. Pull a model supported by the machine's memory and compute. A small quantized model is a sensible starting point; choose the exact model after checking RAM/VRAM.
 3. Start Ollama and confirm its local API is available at http://localhost:11434.
 4. Configure the Charvi API environment:
-   - CHARVI_COORDINATOR_PROVIDER=ollama
+   - COORDINATOR_PROVIDER=ollama
    - OLLAMA_BASE_URL=http://host.docker.internal:11434/v1 when the API runs in Docker and Ollama runs on the host
    - OLLAMA_MODEL=<the exact model tag pulled in Ollama>
 5. Restart the API and inspect GET /v1/agents. The provider catalog reports configuration, not a live connectivity guarantee.
