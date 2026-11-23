@@ -11,7 +11,7 @@ Charvi is a voice-and-text personal AI operating system with one conversational 
 - **Specialist agents:** OpenHands for approval-gated coding, Browser Use in a separate read-only browser worker, Hermes for general work, and OpenClaw as an optional isolated device runtime with owner approval required for device control. n8n is a planned workflow executor.
 - **Data plane:** Supabase PostgreSQL/Auth. RLS protects tenant data; privileged operations are restricted to trusted backend services. LangGraph checkpoints are isolated in the non-exposed charvi_memory schema.
 - **Devices:** cloud-first; laptop worker connects outbound over authenticated TLS and receives narrowly scoped jobs.
-- **Clients:** web and mobile, with text and voice interaction.
+- **Clients:** Next.js web owner console (text-first with optional browser dictation and speech playback); Expo mobile client is planned.
 
 ## Autonomy and approval defaults
 
