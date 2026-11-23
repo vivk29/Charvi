@@ -95,6 +95,67 @@ class SupabaseRestStore:
         )
         return rows[0] if rows else None
 
+    async def create_agent_run(self, record: dict[str, Any]) -> dict[str, Any]:
+        rows = await self._request(
+            "POST", "agent_runs",
+            params={"select": "*"},
+            body=record,
+            prefer="return=representation",
+        )
+        if not rows:
+            raise HTTPException(status_code=502, detail="The agent run was not persisted.")
+        return rows[0]
+
+    async def get_agent_run(self, run_id: str) -> dict[str, Any] | None:
+        rows = await self._request(
+            "GET", "agent_runs",
+            params={"select": "*", "id": f"eq.{run_id}", "limit": "1"},
+        )
+        return rows[0] if rows else None
+
+    async def list_agent_runs(self, workspace_id: str) -> list[dict[str, Any]]:
+        return await self._request(
+            "GET", "agent_runs",
+            params={
+                "select": "id,workspace_id,thread_id,status,objective,result,error_summary,started_at,finished_at,created_at,updated_at",
+                "workspace_id": f"eq.{workspace_id}",
+                "order": "created_at.desc",
+                "limit": "50",
+            },
+        )
+
+    async def update_agent_run(
+        self,
+        run_id: str,
+        workspace_id: str,
+        *,
+        status: str,
+        result: dict[str, Any] | None = None,
+        error_summary: str | None = None,
+        started_at: str | None = None,
+        finished_at: str | None = None,
+    ) -> dict[str, Any] | None:
+        body: dict[str, Any] = {"status": status, "updated_at": __import__("datetime").datetime.now(__import__("datetime").UTC).isoformat()}
+        if result is not None:
+            body["result"] = result
+        if error_summary is not None:
+            body["error_summary"] = error_summary
+        if started_at is not None:
+            body["started_at"] = started_at
+        if finished_at is not None:
+            body["finished_at"] = finished_at
+        rows = await self._request(
+            "PATCH", "agent_runs",
+            params={
+                "id": f"eq.{run_id}",
+                "workspace_id": f"eq.{workspace_id}",
+                "select": "*",
+            },
+            body=body,
+            prefer="return=representation",
+        )
+        return rows[0] if rows else None
+
     async def create_approval(self, record: dict[str, Any]) -> dict[str, Any]:
         rows = await self._request(
             "POST", "approvals",
