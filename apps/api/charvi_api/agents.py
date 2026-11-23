@@ -301,10 +301,9 @@ def route_specialists(
         if candidates:
             selected.append(candidates[0])
     if not selected:
-        fallback = next(
-            (agent_id for agent_id in registry if agent_id in {"hermes", "browser_use"}),
-            None,
-        )
+        # A specialist miss must not silently send a coding or workflow task to a
+        # browser worker. Hermes may provide a non-executing general fallback.
+        fallback = "hermes" if "hermes" in registry else None
         if fallback:
             selected.append(fallback)
     return list(dict.fromkeys(selected))
