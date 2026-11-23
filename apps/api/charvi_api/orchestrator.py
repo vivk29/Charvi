@@ -25,6 +25,7 @@ class _RunState(TypedDict, total=False):
     task: str
     context: str
     allow_code_execution: bool
+    allow_device_control: bool
     specialists: list[AgentResult]
     coordinator: AgentResult
 
@@ -49,6 +50,7 @@ class CharviOrchestrator:
                 registry=self.registry,
                 context=state.get("context", ""),
                 allow_code_execution=state.get("allow_code_execution", False),
+                allow_device_control=state.get("allow_device_control", False),
             )
             return {"specialists": results}
 
@@ -128,11 +130,13 @@ class CharviOrchestrator:
         task: str,
         context: str = "",
         allow_code_execution: bool = False,
+        allow_device_control: bool = False,
     ) -> OrchestrationResult:
         state: _RunState = {
             "task": task,
             "context": context,
             "allow_code_execution": allow_code_execution,
+            "allow_device_control": allow_device_control,
         }
         if self._graph is not None:
             result_state = await self._graph.ainvoke(state)
@@ -147,6 +151,7 @@ class CharviOrchestrator:
                 registry=self.registry,
                 context=context,
                 allow_code_execution=allow_code_execution,
+                allow_device_control=allow_device_control,
             )
             specialist_context = "\n\n".join(
                 f"[{item.agent_id} — {item.status}]\n{item.output or item.error or 'No result'}"
