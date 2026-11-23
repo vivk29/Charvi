@@ -1,6 +1,6 @@
+import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
-import pytest
 
 from charvi_api.main import VoiceSynthesisInput, app
 
