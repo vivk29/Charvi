@@ -144,7 +144,12 @@ export function Dashboard({ initialEmail }: { initialEmail: string | null }) {
   const [voiceStatus, setVoiceStatus] = useState("");
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [isListening, setIsListening] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordStatus, setRecordStatus] = useState("");
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
   const [theme, setTheme] = useState<"dark" | "light">("dark");
 
   useEffect(() => {
@@ -152,7 +157,11 @@ export function Dashboard({ initialEmail }: { initialEmail: string | null }) {
   }, [theme]);
 
   useEffect(() => {
-    return () => recognitionRef.current?.abort();
+    return () => {
+      recognitionRef.current?.abort();
+      mediaRecorderRef.current?.stop();
+      mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+    };
   }, []);
 
   useEffect(() => {
@@ -479,6 +488,112 @@ export function Dashboard({ initialEmail }: { initialEmail: string | null }) {
   recognition.start();
   }
 
+  async function togglePrivateRecording() {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      setRecordStatus("Recording stopped. Transcribing privately…");
+      return;
+    }
+    if (!token || !API_BASE) {
+      setRecordStatus("Sign in and connect the Charvi API before using private transcription.");
+      return;
+    }
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+      setRecordStatus("Private microphone recording is not supported in this browser.");
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaStreamRef.current = stream;
+      audioChunksRef.current = [];
+      const preferredMime = "audio/webm;codecs=opus";
+      const recorder = MediaRecorder.isTypeSupported(preferredMime)
+        ? new MediaRecorder(stream, { mimeType: preferredMime })
+        : new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) audioChunksRef.current.push(event.data);
+      };
+      recorder.onerror = () => {
+        setRecordStatus("The microphone recording failed.");
+        setIsRecording(false);
+        stream.getTracks().forEach((track) => track.stop());
+        mediaRecorderRef.current = null;
+        mediaStreamRef.current = null;
+      };
+      recorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, {
+          type: recorder.mimeType || "audio/webm",
+        });
+        stream.getTracks().forEach((track) => track.stop());
+        mediaRecorderRef.current = null;
+        mediaStreamRef.current = null;
+        setIsRecording(false);
+        if (!audioBlob.size) {
+          setRecordStatus("No audio was captured. Please try again.");
+          return;
+        }
+
+        const extension = audioBlob.type.includes("mp4")
+          ? "m4a"
+          : audioBlob.type.includes("ogg")
+            ? "ogg"
+            : "webm";
+        const form = new FormData();
+        form.append("file", audioBlob, `charvi-recording.${extension}`);
+        form.append(
+          "language",
+          voiceLanguage === "hi-IN" ? "hi" : voiceLanguage === "kn-IN" ? "kn" : "en",
+        );
+        try {
+          const response = await fetch(`${API_BASE}/v1/voice/transcribe`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}` },
+            body: form,
+            cache: "no-store",
+          });
+          const result: unknown = await response.json().catch(() => null);
+          if (!response.ok) {
+            const detail =
+              typeof result === "object" && result !== null && "detail" in result
+                ? String((result as { detail: unknown }).detail)
+                : `Private transcription failed (${response.status}).`;
+            throw new Error(detail);
+          }
+          const transcript =
+            typeof result === "object" && result !== null && "text" in result
+              ? String((result as { text: unknown }).text).trim()
+              : "";
+          if (!transcript) {
+            setRecordStatus("I couldn't detect speech in that recording.");
+            return;
+          }
+          setTask((current) =>
+            current.trim() ? `${current.trim()} ${transcript}` : transcript,
+          );
+          setRecordStatus("Transcription added to your task. Audio was discarded by the worker.");
+        } catch (reason) {
+          setRecordStatus(
+            reason instanceof Error
+              ? `Private transcription unavailable: ${reason.message}. Use device dictation as a fallback.`
+              : "Private transcription unavailable. Use device dictation as a fallback.",
+          );
+        }
+      };
+      recorder.start();
+      setIsRecording(true);
+      setRecordStatus("Recording on this device. Press Stop when finished.");
+    } catch (reason) {
+      setRecordStatus(
+        reason instanceof Error
+          ? `Microphone permission or device error: ${reason.message}`
+          : "Microphone permission or device error.",
+      );
+    }
+  }
+
   async function speakLastResponse(previewText?: string) {
     const text = previewText || lastResult?.coordinator?.output;
     if (!text) return;
@@ -658,7 +773,10 @@ export function Dashboard({ initialEmail }: { initialEmail: string | null }) {
                 <label>Additional context <textarea value={taskContext} onChange={(event) => setTaskContext(event.target.value)} rows={2} maxLength={20000} placeholder="Optional context or instructions" /></label>
                 <div className="voice-controls">
                   <button className="quiet" type="button" onClick={toggleVoiceInput} disabled={isListening && !recognitionRef.current}>
-                    {isListening ? "Stop listening" : "🎙 Dictate task"}
+                    {isListening ? "Stop listening" : "🎙 Device dictation"}
+                  </button>
+                  <button className={isRecording ? "primary" : "quiet"} type="button" onClick={() => void togglePrivateRecording()}>
+                    {isRecording ? "Stop private recording" : "Record privately"}
                   </button>
                   <label className="voice-language">Speech language
                     <select value={voiceLanguage} onChange={(event) => {
@@ -688,6 +806,7 @@ export function Dashboard({ initialEmail }: { initialEmail: string | null }) {
                   </label>
                   <button className="quiet" type="button" onClick={() => void speakLastResponse("Hello, I'm Charvi. How can I help you today?")}>Preview feminine voice</button>
                   <span className="muted tiny">{availableVoices.length} device voices detected. Kokoro voices are used when the private voice worker is connected; otherwise Charvi selects an available device voice.</span>
+                  <span className="muted tiny">{recordStatus || "Private Whisper records only while you press Record privately."}</span>
                   <span className="muted tiny">{voiceStatus || "Browser speech recognition may use your browser or device speech provider."}</span>
                 </div>
 
