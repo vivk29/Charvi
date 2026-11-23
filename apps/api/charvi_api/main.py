@@ -1,3 +1,4 @@
+import hashlib
 import time
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Literal
@@ -55,6 +56,7 @@ class AgentRunInput(BaseModel):
     workspace_id: UUID
     task: str = Field(min_length=1, max_length=12000)
     context: str = Field(default="", max_length=20000)
+    approval_id: UUID | None = None
 
 
 class ApprovalDecisionInput(BaseModel):
@@ -243,7 +245,34 @@ async def run_agent_task(
     orchestrator: Orchestrator,
 ) -> dict[str, object]:
     await owned_workspace(store, payload.workspace_id, user)
-    result = await orchestrator.run(task=payload.task, context=payload.context)
+    allow_code_execution = False
+    if payload.approval_id is not None:
+        approval = await store.get_approval(str(payload.approval_id))
+        if approval is None or approval.get("workspace_id") != str(payload.workspace_id):
+            raise HTTPException(status_code=404, detail="Approval request not found.")
+        if approval.get("status") != "approved":
+            raise HTTPException(status_code=409, detail="OpenHands requires an approved execution request.")
+        expiry = approval.get("expires_at")
+        if expiry and datetime.fromisoformat(expiry) <= datetime.now(UTC):
+            raise HTTPException(status_code=409, detail="Execution approval has expired.")
+        approved_payload = approval.get("payload") or {}
+        task_digest = hashlib.sha256(payload.task.encode("utf-8")).hexdigest()
+        if approved_payload.get("task_sha256") != task_digest:
+            raise HTTPException(
+                status_code=409,
+                detail="Approval does not match this exact task. Create a new approval for the revised task.",
+            )
+        allow_code_execution = True
+
+    result = await orchestrator.run(
+        task=payload.task,
+        context=payload.context,
+        allow_code_execution=allow_code_execution,
+    )
+    code_execution_performed = any(
+        item.execution_performed and item.status == "completed"
+        for item in result.specialists
+    )
     return {
         "status": result.status,
         "routed_to": list(result.routed_to),
@@ -259,8 +288,10 @@ async def run_agent_task(
                 "status": item.status,
                 "output": item.output,
                 "error": item.error,
+                "execution_performed": item.execution_performed,
             }
             for item in result.specialists
         ],
-        "execution_performed": False,
+        "code_execution_performed": code_execution_performed,
+        "external_side_effects_performed": False,
     }
