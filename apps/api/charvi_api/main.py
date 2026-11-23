@@ -198,7 +198,7 @@ async def decide_approval(
     if approval.get("status") != "pending":
         raise HTTPException(status_code=409, detail="This approval has already been decided.")
     expiry = approval.get("expires_at")
-    if expiry and datetime.fromisoformat(expiry.replace("Z", "+00:00")) <= datetime.now(UTC):
+    if expiry and datetime.fromisoformat(expiry) <= datetime.now(UTC):
         raise HTTPException(status_code=409, detail="This approval request has expired.")
     result = await store.decide_approval(
         str(approval_id),
