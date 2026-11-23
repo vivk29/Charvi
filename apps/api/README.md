@@ -118,3 +118,17 @@ To enable locally:
 The worker uses the pinned `hangrylabs/kokorotts:v0.2` image. It is optional and has a 2 GB memory limit / 2 CPU limit; CPU synthesis may be slower. The voice API supports the Kokoro English and Hindi voice IDs currently exposed in the dashboard. Kannada is not in Kokoro's documented voice catalogue, so Kannada speech falls back to a voice installed on the user's device. If the worker is not configured, the dashboard also falls back to browser/device speech synthesis.
 
 Never expose port 7860 publicly. The worker has no direct access to Supabase credentials, the laptop filesystem or the browser session.
+
+## Private voice input (optional faster-whisper worker)
+
+The optional Whisper worker transcribes short dashboard recordings locally in the Compose network. The initial configuration uses the multilingual `tiny` model, CPU execution and INT8 quantization because the owner's laptop hardware has not yet been confirmed. It accepts up to 20 MB of WebM, Ogg, WAV, MP3, MP4/AAC or FLAC audio and supports English, Hindi and Kannada language hints.
+
+1. Set a strong random `WHISPER_WORKER_TOKEN` in the API `.env`.
+2. Set `WHISPER_WORKER_URL=http://whisper-worker:8095`.
+3. Run `docker compose --profile voice up -d --build`.
+4. The first start downloads the model into the persistent `whisper-model-cache` volume; allow time for this initial download.
+5. Use **Record privately** in the dashboard.
+
+The browser sends audio to the authenticated Charvi API. The API forwards it to the isolated worker using a separate token. Audio is held in temporary files only during transcription and removed after processing. The worker receives no Supabase or model-provider credentials, and its port is not published to the host.
+
+The model size is deliberately configurable. The faster-whisper project documents CPU INT8 execution and reports materially lower memory use than its FP32 configuration; actual speed depends on the host CPU. Do not switch to a larger model until measuring the laptop's RAM and latency.
