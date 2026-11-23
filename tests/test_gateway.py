@@ -130,6 +130,24 @@ def test_reversible_workspace_write_does_not_need_approval() -> None:
     assert decision.approval_required is False
 
 
+def test_execution_payload_changes_approval_digest() -> None:
+    original = GatewayRequest(
+        workspace_id="workspace-1",
+        actor_id="owner-1",
+        action=ActionRequest(ActionCategory.FINANCIAL, "supplier", "Pay invoice"),
+        idempotency_key="invoice-1",
+        payload={"amount": 1000, "currency": "INR"},
+    )
+    changed = GatewayRequest(
+        workspace_id="workspace-1",
+        actor_id="owner-1",
+        action=ActionRequest(ActionCategory.FINANCIAL, "supplier", "Pay invoice"),
+        idempotency_key="invoice-1",
+        payload={"amount": 10000, "currency": "INR"},
+    )
+    assert payload_digest(original) != payload_digest(changed)
+
+
 def test_http_evaluation_endpoint_checks_workspace_and_never_executes_action(client: TestClient) -> None:
     response = client.post(
         "/v1/actions/evaluate",
