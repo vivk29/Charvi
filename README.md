@@ -67,7 +67,7 @@ docs/
 - The policy allows read/draft work and reversible workspace writes without creating an approval request. Higher-impact categories are gated.
 - GitHub Actions lint and tests passed for the workspace-ownership code milestone.
 
-**Not yet live:** the API is not deployed or configured with a server-only Supabase service-role key; no Charvi web/mobile interface, Hermes runtime, specialist agent orchestration, actual action executor, laptop pairing, voice interface, notifications, backup automation or restore service is deployed. Approval decisions are recorded, but the approved action is not executed by this API.
+**Not yet live:** the API and agent runtimes are not deployed or configured with server-only Supabase credentials; no Charvi web/mobile interface, Hermes/OpenClaw/OpenHands services, Browser Use worker, laptop pairing, voice interface, notifications, backup automation or restore service is deployed. LangGraph routing and agent adapters are committed, but no durable checkpoint store is wired yet. Approval decisions are recorded and validated, but a general-purpose action executor is not deployed.
 
 ## Local development
 
