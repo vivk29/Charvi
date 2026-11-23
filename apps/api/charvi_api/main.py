@@ -46,7 +46,9 @@ class ApprovalDecisionInput(BaseModel):
     note: str | None = Field(default=None, max_length=2000)
 
 
-def risk_for(category: ActionCategory) -> str:
+def risk_for(category: ActionCategory, reversible: bool = False) -> str:
+    if category == ActionCategory.WRITE and reversible:
+        return "low"
     if category in {ActionCategory.FINANCIAL, ActionCategory.DESTRUCTIVE,
                     ActionCategory.CREDENTIAL_ACCESS}:
         return "critical"
@@ -137,7 +139,7 @@ async def create_approval_request(
         "requested_by_user_id": user.user_id,
         "action_type": payload.category.value,
         "action_category": payload.category.value,
-        "risk_level": risk_for(payload.category),
+        "risk_level": risk_for(payload.category, payload.reversible),
         "title": payload.title,
         "description": payload.description,
         "payload": {
