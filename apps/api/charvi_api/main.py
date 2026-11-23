@@ -43,9 +43,9 @@ async def lifespan(application: FastAPI):
         try:
             # Restrict checkpoint deserialization before the saver is initialized.
             os.environ.setdefault("LANGGRAPH_STRICT_MSGPACK", "true")
+            from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
             from psycopg import AsyncConnection
             from psycopg.rows import dict_row
-            from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
             connection = await AsyncConnection.connect(
                 settings.langgraph_postgres_uri,
@@ -433,7 +433,7 @@ async def run_agent_task(
             finished_at=datetime.now(UTC).isoformat(),
         )
         return response
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         try:
             await store.update_agent_run(
                 run_id,
