@@ -8,13 +8,18 @@ from charvi_api.gateway import (
 from charvi_api.main import app
 from charvi_api.policy import ActionCategory, ActionRequest
 from fastapi.testclient import TestClient
+import pytest
 
 
-client = TestClient(app)
-app.dependency_overrides[get_current_user] = lambda: UserIdentity(
-    user_id="00000000-0000-4000-8000-000000000001",
-    email="owner@example.test",
-)
+@pytest.fixture
+def client() -> TestClient:
+    app.dependency_overrides[get_current_user] = lambda: UserIdentity(
+        user_id="00000000-0000-4000-8000-000000000001",
+        email="owner@example.test",
+    )
+    with TestClient(app) as test_client:
+        yield test_client
+    app.dependency_overrides.clear()
 
 
 def make_request(category: ActionCategory = ActionCategory.FINANCIAL) -> GatewayRequest:
@@ -110,7 +115,7 @@ def test_low_risk_read_can_be_evaluated_without_approval() -> None:
     assert decision.approval_required is False
 
 
-def test_http_evaluation_endpoint_never_executes_action() -> None:
+def test_http_evaluation_endpoint_never_executes_action(client: TestClient) -> None:
     response = client.post(
         "/v1/actions/evaluate",
         json={
