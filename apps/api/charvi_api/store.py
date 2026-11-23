@@ -62,6 +62,8 @@ class SupabaseRestStore:
 
         if response.status_code in (401, 403):
             raise HTTPException(status_code=503, detail="Charvi's private database credential was rejected.")
+        if response.status_code == 409:
+            raise HTTPException(status_code=409, detail="This request conflicts with an existing record.")
         if response.status_code >= 500:
             raise HTTPException(status_code=503, detail="Charvi's database is temporarily unavailable.")
         if response.status_code >= 400:
