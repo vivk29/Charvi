@@ -179,6 +179,12 @@ class CharviOrchestrator:
             configured = bool(self.settings.ollama_base_url and self.settings.ollama_model)
         elif self.settings.coordinator_provider.strip().lower() == "openai":
             configured = bool(self.settings.openai_api_key and self.settings.openai_model)
+        elif self.settings.coordinator_provider.strip().lower() == "compatible":
+            configured = bool(
+                self.settings.compatible_base_url
+                and self.settings.compatible_api_key
+                and self.settings.compatible_model
+            )
         else:
             configured = False
         rows.append({
