@@ -96,7 +96,11 @@ class CharviOrchestrator:
                 "kind": "specialist_runtime",
                 "capabilities": list(backend.capabilities),
                 "configured": (
-                    bool(getattr(backend, "settings", None).browser_use_enabled)
+                    bool(
+                        backend.settings.browser_use_enabled
+                        and backend.settings.browser_use_worker_url
+                        and backend.settings.browser_use_worker_token
+                    )
                     if agent_id == "browser_use"
                     else True
                 ),
