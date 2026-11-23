@@ -202,11 +202,14 @@ async def create_workspace(
     user: CurrentUser,
     store: Store,
 ) -> dict[str, object]:
-    slug_base = re.sub(r"[^a-z0-9]+", "-", payload.name.lower()).strip("-")[:48]
+    name = payload.name.strip()
+    if not name:
+        raise HTTPException(status_code=422, detail="Workspace name cannot be blank.")
+    slug_base = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")[:48]
     slug = f"{slug_base or 'workspace'}-{uuid4().hex[:8]}"
     return await store.create_workspace({
         "owner_id": user.user_id,
-        "name": payload.name.strip(),
+        "name": name,
         "slug": slug,
     })
 
