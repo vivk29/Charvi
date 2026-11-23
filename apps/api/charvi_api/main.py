@@ -1,10 +1,12 @@
 import hashlib
+import os
 import time
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Literal
-from uuid import UUID
+from uuid import UUID, uuid4
 
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from .agents import AgentSettings
@@ -56,6 +58,8 @@ class AgentRunInput(BaseModel):
     workspace_id: UUID
     task: str = Field(min_length=1, max_length=12000)
     context: str = Field(default="", max_length=20000)
+    thread_id: UUID | None = None
+    idempotency_key: str = Field(default_factory=lambda: str(uuid4()), min_length=1, max_length=128)
     approval_id: UUID | None = None
 
 
@@ -246,6 +250,49 @@ async def list_configured_agents(
     return orchestrator.catalog()
 
 
+def checkpoint_thread_key(user_id: str, workspace_id: str, thread_id: str) -> str:
+    """Namespace checkpoint threads by verified owner and workspace."""
+    material = f"{user_id}:{workspace_id}:{thread_id}".encode()
+    return hashlib.sha256(material).hexdigest()
+
+
+def format_orchestration_result(result) -> dict[str, object]:
+    openhands_invoked = any(
+        item.agent_id == "openhands" and item.status == "completed"
+        for item in result.specialists
+    )
+    openclaw_invoked = any(
+        item.agent_id == "openclaw" and item.status == "completed"
+        for item in result.specialists
+    )
+    return {
+        "status": result.status,
+        "routed_to": list(result.routed_to),
+        "coordinator": {
+            "agent_id": result.coordinator.agent_id,
+            "status": result.coordinator.status,
+            "output": result.coordinator.output,
+            "error": result.coordinator.error,
+        },
+        "specialists": [
+            {
+                "agent_id": item.agent_id,
+                "status": item.status,
+                "output": item.output,
+                "error": item.error,
+                "execution_performed": item.execution_performed,
+            }
+            for item in result.specialists
+        ],
+        "openhands_runtime_invoked": openhands_invoked,
+        "code_execution_possible": openhands_invoked,
+        "code_execution_performed": None if openhands_invoked else False,
+        "device_control_runtime_invoked": openclaw_invoked,
+        "device_control_performed": None if openclaw_invoked else False,
+        "external_side_effects_performed": None if openclaw_invoked else False,
+    }
+
+
 @app.post("/v1/agent-runs", tags=["agents"])
 async def run_agent_task(
     payload: AgentRunInput,
@@ -282,45 +329,133 @@ async def run_agent_task(
         allow_code_execution = action_category == ActionCategory.WRITE.value
         allow_device_control = action_category == ActionCategory.DEVICE_CONTROL.value
 
-    result = await orchestrator.run(
-        task=payload.task,
-        context=payload.context,
-        allow_code_execution=allow_code_execution,
-        allow_device_control=allow_device_control,
+    external_thread_id = str(payload.thread_id or uuid4())
+    internal_thread_id = checkpoint_thread_key(
+        user.user_id, str(payload.workspace_id), external_thread_id
     )
-    openhands_invoked = any(
-        item.agent_id == "openhands" and item.status == "completed"
-        for item in result.specialists
-    )
-    openclaw_invoked = any(
-        item.agent_id == "openclaw" and item.status == "completed"
-        for item in result.specialists
-    )
-    code_execution_performed: bool | None = None if openhands_invoked else False
-    device_control_performed: bool | None = None if openclaw_invoked else False
-    return {
-        "status": result.status,
-        "routed_to": list(result.routed_to),
-        "coordinator": {
-            "agent_id": result.coordinator.agent_id,
-            "status": result.coordinator.status,
-            "output": result.coordinator.output,
-            "error": result.coordinator.error,
+    started_at = datetime.now(UTC).isoformat()
+    run_record = await store.create_agent_run({
+        "workspace_id": str(payload.workspace_id),
+        "requested_by": user.user_id,
+        "status": "running",
+        "objective": payload.task,
+        "input": {
+            "task": payload.task,
+            "context": payload.context,
+            "thread_id": external_thread_id,
+            "approval_id": str(payload.approval_id) if payload.approval_id else None,
         },
-        "specialists": [
-            {
-                "agent_id": item.agent_id,
-                "status": item.status,
-                "output": item.output,
-                "error": item.error,
-                "execution_performed": item.execution_performed,
-            }
-            for item in result.specialists
-        ],
-        "openhands_runtime_invoked": openhands_invoked,
-        "code_execution_possible": openhands_invoked,
-        "code_execution_performed": code_execution_performed,
-        "device_control_runtime_invoked": openclaw_invoked,
-        "device_control_performed": device_control_performed,
-        "external_side_effects_performed": None if openclaw_invoked else False,
-    }
+        "thread_id": external_thread_id,
+        "idempotency_key": payload.idempotency_key,
+        "started_at": started_at,
+    })
+    run_id = str(run_record["id"])
+    try:
+        result = await orchestrator.run(
+            task=payload.task,
+            context=payload.context,
+            allow_code_execution=allow_code_execution,
+            allow_device_control=allow_device_control,
+            thread_id=internal_thread_id,
+        )
+        response = format_orchestration_result(result)
+        response.update({
+            "run_id": run_id,
+            "thread_id": external_thread_id,
+            "checkpointing_enabled": orchestrator.checkpointing_enabled,
+        })
+        await store.update_agent_run(
+            run_id,
+            str(payload.workspace_id),
+            status="succeeded" if result.status == "completed" else "failed",
+            result=response,
+            finished_at=datetime.now(UTC).isoformat(),
+        )
+        return response
+    except Exception as exc:  # noqa: BLE001
+        try:
+            await store.update_agent_run(
+                run_id,
+                str(payload.workspace_id),
+                status="failed",
+                error_summary=type(exc).__name__,
+                finished_at=datetime.now(UTC).isoformat(),
+            )
+        except Exception:  # noqa: BLE001
+            pass
+        raise
+
+
+@app.get("/v1/workspaces/{workspace_id}/agent-runs", tags=["agents"])
+async def list_agent_runs(
+    workspace_id: UUID,
+    user: CurrentUser,
+    store: Store,
+) -> list[dict[str, object]]:
+    await owned_workspace(store, workspace_id, user)
+    return await store.list_agent_runs(str(workspace_id))
+
+
+@app.get("/v1/agent-runs/{run_id}", tags=["agents"])
+async def get_agent_run(
+    run_id: UUID,
+    user: CurrentUser,
+    store: Store,
+) -> dict[str, object]:
+    record = await store.get_agent_run(str(run_id))
+    if record is None:
+        raise HTTPException(status_code=404, detail="Agent run not found.")
+    await owned_workspace(store, UUID(record["workspace_id"]), user)
+    return {key: value for key, value in record.items() if key != "input"}
+
+
+@app.post("/v1/agent-runs/{run_id}/resume", tags=["agents"])
+async def resume_agent_run(
+    run_id: UUID,
+    user: CurrentUser,
+    store: Store,
+    orchestrator: Orchestrator,
+) -> dict[str, object]:
+    record = await store.get_agent_run(str(run_id))
+    if record is None:
+        raise HTTPException(status_code=404, detail="Agent run not found.")
+    workspace_id = UUID(record["workspace_id"])
+    await owned_workspace(store, workspace_id, user)
+    if record.get("status") not in {"running", "failed"}:
+        raise HTTPException(status_code=409, detail="Only interrupted or failed runs can be resumed.")
+    run_input = record.get("input") or {}
+    if run_input.get("approval_id"):
+        raise HTTPException(
+            status_code=409,
+            detail="Approval-bound execution cannot be resumed automatically. Request a fresh approval first.",
+        )
+    external_thread_id = record.get("thread_id") or run_input.get("thread_id")
+    if not external_thread_id:
+        raise HTTPException(status_code=409, detail="This run has no saved conversation thread.")
+    internal_thread_id = checkpoint_thread_key(
+        user.user_id, str(workspace_id), str(external_thread_id)
+    )
+    try:
+        result = await orchestrator.resume(thread_id=internal_thread_id)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    if result is None:
+        raise HTTPException(
+            status_code=409,
+            detail="No pending LangGraph checkpoint exists for this run. Start a new run instead.",
+        )
+    response = format_orchestration_result(result)
+    response.update({
+        "run_id": str(run_id),
+        "thread_id": str(external_thread_id),
+        "checkpointing_enabled": orchestrator.checkpointing_enabled,
+        "resumed": True,
+    })
+    await store.update_agent_run(
+        str(run_id),
+        str(workspace_id),
+        status="succeeded" if result.status == "completed" else "failed",
+        result=response,
+        finished_at=datetime.now(UTC).isoformat(),
+    )
+    return response
