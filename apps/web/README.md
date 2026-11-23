@@ -10,6 +10,7 @@ The first web dashboard milestone provides:
 - Pending approval review and decision.
 - Dark/light themes and responsive layouts.
 - Feminine voice selection, private Kokoro speech output when configured, and device voice fallback.
+- Private microphone recording routed through the isolated faster-whisper worker, with browser/device dictation as a fallback.
 
 ## Local setup
 
@@ -34,6 +35,6 @@ The dashboard requires a workspace. If none exists, create one from the first-ru
 
 The dashboard includes browser-based speech dictation (English India, Kannada and Hindi) and speech playback. Speech output defaults to Kokoro's feminine `af_heart` voice when the optional private worker is connected; `af_bella`, `af_nicole`, British `bf_emma`, and Hindi `hf_alpha` / `hf_beta` are selectable. If Kokoro is unavailable, Charvi falls back to a matching voice installed on the user's device. Device voice names and gender metadata vary by operating system/browser.
 
-Kokoro's documented voice catalogue includes English and Hindi but not Kannada; Kannada therefore uses the device voice fallback. Browser speech recognition can use the browser/device speech provider and is not a private local transcription engine. A self-hosted Whisper worker remains a later milestone.
+Kokoro's documented voice catalogue includes English and Hindi but not Kannada; Kannada therefore uses the device voice fallback. Browser speech recognition can use the browser/device speech provider and is not a private local transcription engine. The dashboard also has a **Record privately** control that sends the recording to Charvi's authenticated API and isolated faster-whisper worker. The initial worker configuration uses the multilingual tiny model on CPU with INT8. The worker supports English, Hindi and Kannada language hints. Audio is held in a temporary file during transcription and removed afterwards; the worker does not receive Supabase credentials. This worker is source-controlled but must be started with the optional Compose `voice` profile.
 
 This remains a text-first owner console with optional voice input and spoken responses. The mobile app, notifications, live agent deployment and production hosting are later milestones.
