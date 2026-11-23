@@ -55,6 +55,7 @@ To opt into OpenAI instead, set COORDINATOR_PROVIDER=openai, OPENAI_API_KEY and 
 - GET /v1/agents lists configured runtimes, orchestration and the selected coordinator provider.
 - POST /v1/agent-runs routes a request through the workforce, stores a durable run record and returns a thread_id.
 - GET /v1/workspaces/{workspace_id}/agent-runs lists the owner's run history.
+- GET /v1/workspaces/{workspace_id}/threads/{thread_id}/history retrieves the bounded conversation history for that owner-scoped thread.
 - GET /v1/agent-runs/{run_id} retrieves an owner-scoped run record.
 - POST /v1/agent-runs/{run_id}/resume resumes pending graph work from the last saved checkpoint.
 - Reuse the returned thread_id on later requests to continue a thread. Checkpoint IDs are internally namespaced by verified user and workspace.
