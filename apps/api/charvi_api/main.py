@@ -20,16 +20,74 @@ CurrentUser = Annotated[UserIdentity, Depends(get_current_user)]
 Store = Annotated[SupabaseRestStore, Depends(get_store)]
 
 
-def get_orchestrator() -> CharviOrchestrator:
-    return CharviOrchestrator(AgentSettings())
+def get_orchestrator(request: Request) -> CharviOrchestrator:
+    orchestrator = getattr(request.app.state, "orchestrator", None)
+    if orchestrator is None:
+        orchestrator = CharviOrchestrator(AgentSettings())
+        request.app.state.orchestrator = orchestrator
+    return orchestrator
 
 
 Orchestrator = Annotated[CharviOrchestrator, Depends(get_orchestrator)]
 
+
+@asynccontextmanager
+async def lifespan(application: FastAPI):
+    settings = AgentSettings()
+    connection = None
+    checkpointer = None
+    if settings.langgraph_postgres_uri:
+        try:
+            # Restrict checkpoint deserialization before the saver is initialized.
+            os.environ.setdefault("LANGGRAPH_STRICT_MSGPACK", "true")
+            from psycopg import AsyncConnection
+            from psycopg.rows import dict_row
+            from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+
+            connection = await AsyncConnection.connect(
+                settings.langgraph_postgres_uri,
+                autocommit=True,
+                prepare_threshold=0,
+                row_factory=dict_row,
+                options="-c search_path=charvi_memory,public",
+            )
+            checkpointer = AsyncPostgresSaver(connection)
+            await checkpointer.setup()
+            for table in (
+                "checkpoints",
+                "checkpoint_blobs",
+                "checkpoint_writes",
+                "checkpoint_migrations",
+            ):
+                await connection.execute(
+                    f"ALTER TABLE charvi_memory.{table} ENABLE ROW LEVEL SECURITY"
+                )
+        except Exception as exc:  # noqa: BLE001
+            if connection is not None:
+                await connection.close()
+            raise RuntimeError(
+                "LangGraph checkpoint storage was configured but could not be initialized; "
+                "Charvi is refusing to start without its requested durable memory."
+            ) from exc
+
+    application.state.orchestrator = CharviOrchestrator(
+        settings,
+        checkpointer=checkpointer,
+    )
+    try:
+        yield
+    finally:
+        if connection is not None:
+            await connection.close()
+
+
 app = FastAPI(
     title="Charvi Control Plane",
-    version="0.4.0",
-    description="Identity, workspace, policy, approvals, audit and task-routing API for Charvi.",
+    version="0.5.0",
+    description=(
+        "Identity, workspace, policy, approvals, audit, durable task history and task-routing API."
+    ),
+    lifespan=lifespan,
 )
 
 
