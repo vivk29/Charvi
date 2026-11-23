@@ -261,7 +261,7 @@ async def run_agent_task(
         if approved_payload.get("reversible") is not False:
             raise HTTPException(status_code=409, detail="OpenHands requires an explicitly non-reversible execution approval.")
         execution_digest = hashlib.sha256(
-            f"{payload.task}\0{payload.context}".encode("utf-8")
+            f"{payload.task}\0{payload.context}".encode()
         ).hexdigest()
         if approved_payload.get("execution_sha256") != execution_digest:
             raise HTTPException(
