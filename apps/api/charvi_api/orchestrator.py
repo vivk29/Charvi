@@ -263,7 +263,12 @@ class CharviOrchestrator:
             raise RuntimeError("Durable LangGraph checkpointing is not configured.")
         config = {"configurable": {"thread_id": thread_id}}
         snapshot = await self._graph.aget_state(config)
-        if snapshot is None or not snapshot.next:
+        if snapshot is None or not snapshot.values:
             return None
-        result_state = await self._graph.ainvoke(None, config=config)
-        return self._from_graph_state(result_state)
+        if snapshot.next:
+            result_state = await self._graph.ainvoke(None, config=config)
+            return self._from_graph_state(result_state)
+        if snapshot.values.get("coordinator"):
+            # Recover a completed result if the process died before updating agent_runs.
+            return self._from_graph_state(snapshot.values)
+        return None
