@@ -12,4 +12,4 @@ This optional worker provides self-hosted speech-to-text for dashboard voice rec
 
 The tiny model is a conservative first configuration because the laptop hardware has not yet been confirmed. Increase `WHISPER_MODEL_SIZE` only after testing memory and latency on the actual host.
 
-Start with `docker compose --profile voice up -d --build` after setting `WHISPER_WORKER_TOKEN` in the API `.env`. The API passes only the worker token and model settings to this container; it does not pass Supabase or model-provider secrets.
+Start with `docker compose --profile transcription up -d --build` after setting `WHISPER_WORKER_TOKEN` in the API `.env`. The API passes only the worker token and model settings to this container; it does not pass Supabase or model-provider secrets.
