@@ -161,6 +161,76 @@ class SupabaseRestStore:
         )
         return rows[0] if rows else None
 
+    async def upsert_memory(self, record: dict[str, Any]) -> dict[str, Any]:
+        rows = await self._request(
+            "POST", "user_memories",
+            params={
+                "on_conflict": "workspace_id,memory_key",
+                "select": "id,workspace_id,owner_id,memory_key,title,content,memory_type,source_run_id,confidence,status,created_at,updated_at",
+            },
+            body=record,
+            prefer="resolution=merge-duplicates,return=representation",
+        )
+        if not rows:
+            raise HTTPException(status_code=502, detail="The memory was not saved.")
+        return rows[0]
+
+    async def list_memories(self, workspace_id: str, owner_id: str) -> list[dict[str, Any]]:
+        return await self._request(
+            "GET", "user_memories",
+            params={
+                "select": "id,memory_key,title,content,memory_type,source_run_id,confidence,status,created_at,updated_at",
+                "workspace_id": f"eq.{workspace_id}",
+                "owner_id": f"eq.{owner_id}",
+                "status": "eq.active",
+                "order": "updated_at.desc",
+                "limit": "100",
+            },
+        )
+
+    async def search_memories(
+        self,
+        workspace_id: str,
+        owner_id: str,
+        query: str,
+        *,
+        limit: int = 5,
+    ) -> list[dict[str, Any]]:
+        return await self._request(
+            "GET", "user_memories",
+            params={
+                "select": "id,memory_key,title,content,memory_type,confidence",
+                "workspace_id": f"eq.{workspace_id}",
+                "owner_id": f"eq.{owner_id}",
+                "status": "eq.active",
+                "search_vector": f"wfts.{query}",
+                "order": "updated_at.desc",
+                "limit": str(max(1, min(limit, 10))),
+            },
+        )
+
+    async def archive_memory(
+        self,
+        memory_id: str,
+        workspace_id: str,
+        owner_id: str,
+        *,
+        updated_at: str,
+    ) -> dict[str, Any] | None:
+        rows = await self._request(
+            "PATCH", "user_memories",
+            params={
+                "id": f"eq.{memory_id}",
+                "workspace_id": f"eq.{workspace_id}",
+                "owner_id": f"eq.{owner_id}",
+                "status": "eq.active",
+                "select": "id,workspace_id,memory_key,title,status,updated_at",
+            },
+            body={"status": "archived", "updated_at": updated_at},
+            prefer="return=representation",
+        )
+        return rows[0] if rows else None
+
     async def create_approval(self, record: dict[str, Any]) -> dict[str, Any]:
         rows = await self._request(
             "POST", "approvals",
