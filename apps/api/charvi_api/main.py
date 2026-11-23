@@ -1,6 +1,7 @@
 import hashlib
 import logging
 import os
+import re
 import time
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
@@ -8,6 +9,7 @@ from typing import Annotated, Literal
 from uuid import UUID, uuid4
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from .agents import AgentSettings
@@ -99,6 +101,23 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+allowed_origins = [
+    origin.strip()
+    for origin in os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:3000").split(",")
+    if origin.strip()
+]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins,
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PATCH", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "apikey"],
+)
+
+
+class WorkspaceCreateInput(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+
 
 class ActionEvaluationInput(BaseModel):
     workspace_id: UUID
@@ -175,6 +194,21 @@ async def health() -> dict[str, str]:
 @app.get("/v1/me", tags=["identity"])
 async def current_identity(user: CurrentUser) -> dict[str, str | None]:
     return {"user_id": user.user_id, "email": user.email}
+
+
+@app.post("/v1/workspaces", tags=["workspaces"], status_code=201)
+async def create_workspace(
+    payload: WorkspaceCreateInput,
+    user: CurrentUser,
+    store: Store,
+) -> dict[str, object]:
+    slug_base = re.sub(r"[^a-z0-9]+", "-", payload.name.lower()).strip("-")[:48]
+    slug = f"{slug_base or 'workspace'}-{uuid4().hex[:8]}"
+    return await store.create_workspace({
+        "owner_id": user.user_id,
+        "name": payload.name.strip(),
+        "slug": slug,
+    })
 
 
 @app.get("/v1/workspaces", tags=["workspaces"])
