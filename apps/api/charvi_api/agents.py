@@ -12,6 +12,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class AgentSettings(BaseSettings):
     coordinator_provider: str = "ollama"
+    langgraph_postgres_uri: str = ""
     ollama_base_url: str = ""
     ollama_model: str = ""
     ollama_api_key: str = ""
