@@ -6,7 +6,7 @@ import os
 import tempfile
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
 from pydantic import BaseModel
@@ -84,7 +84,7 @@ async def health() -> dict[str, object]:
 @app.post("/v1/transcribe", response_model=TranscriptionResult)
 async def transcribe(
     file: Annotated[UploadFile, File()],
-    language: Annotated[str | None, Form()] = None,
+    language: Annotated[Literal["en", "hi", "kn"] | None, Form()] = None,
     worker_token: Annotated[str | None, Header(alias="X-Charvi-Worker-Token")] = None,
 ) -> TranscriptionResult:
     authorize_worker(worker_token)
