@@ -4,13 +4,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, TypedDict
 
-from .agents import (
-    AgentResult,
-    AgentSettings,
-    OpenAIResponsesBackend,
-    build_agent_registry,
-    run_specialists,
-)
+from .agents import AgentResult, AgentSettings, build_agent_registry, run_specialists
+from .providers import build_coordinator
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,7 +29,7 @@ class CharviOrchestrator:
     def __init__(self, settings: AgentSettings | None = None):
         self.settings = settings or AgentSettings()
         self.registry = build_agent_registry(self.settings)
-        self.coordinator = OpenAIResponsesBackend(self.settings)
+        self.coordinator = build_coordinator(self.settings)
         self._graph = self._build_graph()
 
     def _build_graph(self):
@@ -62,9 +57,7 @@ class CharviOrchestrator:
             combined_context = "\n\n".join(
                 part for part in (state.get("context", ""), specialist_context) if part
             )
-            result = await self.coordinator.invoke(
-                task=state["task"], context=combined_context
-            )
+            result = await self.coordinator.invoke(task=state["task"], context=combined_context)
             if result.status != "completed":
                 successful = [
                     item for item in state.get("specialists", [])
@@ -117,11 +110,18 @@ class CharviOrchestrator:
             "configured": self._graph is not None,
             "durable_checkpointing": False,
         })
+        if self.settings.coordinator_provider.strip().lower() == "ollama":
+            configured = bool(self.settings.ollama_base_url and self.settings.ollama_model)
+        elif self.settings.coordinator_provider.strip().lower() == "openai":
+            configured = bool(self.settings.openai_api_key and self.settings.openai_model)
+        else:
+            configured = False
         rows.append({
-            "id": "openai",
+            "id": self.coordinator.agent_id,
             "kind": "coordinator_model",
+            "provider": self.settings.coordinator_provider,
             "capabilities": list(self.coordinator.capabilities),
-            "configured": bool(self.settings.openai_api_key and self.settings.openai_model),
+            "configured": configured,
         })
         return rows
 
