@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
-from typing import Any, TypedDict
+from typing import Annotated, Any, TypedDict
 
 from .agents import AgentResult, AgentSettings, build_agent_registry, run_specialists
 from .providers import build_coordinator, coordinator_status
@@ -23,10 +23,19 @@ class _RunState(TypedDict, total=False):
     allow_device_control: bool
     specialists: list[dict[str, Any]]
     coordinator: dict[str, Any]
+    history: Annotated[list[dict[str, str]], _merge_history]
 
 
 def _restore_result(value: dict[str, Any]) -> AgentResult:
     return AgentResult(**value)
+
+
+def _merge_history(
+    previous: list[dict[str, str]] | None,
+    new: list[dict[str, str]] | None,
+) -> list[dict[str, str]]:
+    """Append conversation messages while bounding checkpoint growth."""
+    return ((previous or []) + (new or []))[-40:]
 
 
 class CharviOrchestrator:
@@ -45,10 +54,18 @@ class CharviOrchestrator:
             return None
 
         async def dispatch(state: _RunState) -> dict[str, Any]:
+            previous_history = state.get("history", [])[:-1]
+            history_context = "\\n".join(
+                f"{message['role']}: {message['content']}"
+                for message in previous_history
+            )
+            specialist_context = "\\n\\n".join(
+                part for part in (state.get("context", ""), history_context) if part
+            )
             results = await run_specialists(
                 task=state["task"],
                 registry=self.registry,
-                context=state.get("context", ""),
+                context=specialist_context,
                 allow_code_execution=state.get("allow_code_execution", False),
                 allow_device_control=state.get("allow_device_control", False),
             )
@@ -80,7 +97,13 @@ class CharviOrchestrator:
                         ),
                         execution_performed=any(item.execution_performed for item in successful),
                     )
-            return {"coordinator": asdict(result)}
+            return {
+                "coordinator": asdict(result),
+                "history": [{
+                    "role": "assistant",
+                    "content": result.output or result.error or "No response was produced.",
+                }],
+            }
 
         graph = StateGraph(_RunState)
         graph.add_node("dispatch_specialists", dispatch)
@@ -172,6 +195,7 @@ class CharviOrchestrator:
             "context": context,
             "allow_code_execution": allow_code_execution,
             "allow_device_control": allow_device_control,
+            "history": [{"role": "user", "content": task + ("\\n\\n" + context if context else "")}],
         }
         if self._graph is not None:
             config = {"configurable": {"thread_id": thread_id}} if thread_id else None
@@ -212,6 +236,17 @@ class CharviOrchestrator:
             specialists=tuple(specialist_results),
             routed_to=tuple(item.agent_id for item in specialist_results),
         )
+
+    async def get_thread_history(self, *, thread_id: str) -> list[dict[str, str]]:
+        """Return bounded conversation history for one already-authorized thread."""
+        if self._graph is None or not self.checkpointing_enabled:
+            raise RuntimeError("Durable LangGraph checkpointing is not configured.")
+        snapshot = await self._graph.aget_state({
+            "configurable": {"thread_id": thread_id}
+        })
+        if snapshot is None:
+            return []
+        return snapshot.values.get("history", [])
 
     async def resume(self, *, thread_id: str) -> OrchestrationResult | None:
         """Resume a graph with pending work from its last durable checkpoint."""
