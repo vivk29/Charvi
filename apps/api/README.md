@@ -125,7 +125,7 @@ The optional Whisper worker transcribes short dashboard recordings locally in th
 
 1. Set a strong random `WHISPER_WORKER_TOKEN` in the API `.env`.
 2. Set `WHISPER_WORKER_URL=http://whisper-worker:8095`.
-3. Run `docker compose --profile voice up -d --build`.
+3. Run `docker compose --profile transcription up -d --build`.
 4. The first start downloads the model into the persistent `whisper-model-cache` volume; allow time for this initial download.
 5. Use **Record privately** in the dashboard.
 
