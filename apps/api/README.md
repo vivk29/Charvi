@@ -58,7 +58,7 @@ Example read-only research request:
 
 ### Approval-bound OpenHands task
 
-For code execution, calculate SHA-256 over the exact UTF-8 task string. Create an approval with `category: "write"`, `reversible: false`, and include the digest as `payload.task_sha256`. After the owner approves it, pass that approval ID with the identical task to `POST /v1/agent-runs`. Any change to the task requires a new approval. OpenHands remains unavailable unless `OPENHANDS_ENABLED=true`, its Agent Server URL and session API key are configured, and the server runs an isolated workspace.
+For code execution, calculate SHA-256 over the UTF-8 bytes of `task + NUL + context` (the exact request strings). Create an approval with `category: "write"`, `reversible: false`, and include the digest as `payload.execution_sha256`. After the owner approves it, pass that approval ID with the identical task to `POST /v1/agent-runs`. Any change to the task or context requires a new approval. OpenHands remains unavailable unless `OPENHANDS_ENABLED=true`, its Agent Server URL and session API key are configured, and the server runs an isolated workspace.
 
 ## Security boundary
 
