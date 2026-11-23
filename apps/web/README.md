@@ -31,4 +31,6 @@ The dashboard requires a workspace. If none exists, create one from the first-ru
 
 ## Current limits
 
-This is the text-first owner console. Voice capture, mobile app, notifications, live agent deployment and production hosting are later milestones.
+The dashboard includes browser-based speech dictation (English India, Kannada and Hindi) and speech playback for the latest response. Browser speech recognition can use the browser/device speech provider and is not a private local transcription engine. A self-hosted Whisper worker is a later option for private/offline transcription.
+
+This remains a text-first owner console with optional browser voice controls. The mobile app, notifications, live agent deployment and production hosting are later milestones.
