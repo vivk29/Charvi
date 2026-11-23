@@ -58,3 +58,15 @@ docs/
 ## Local development
 
 The first milestone will provide a minimal API health endpoint and policy primitives. Do not connect live device credentials or production accounts until the threat model, pairing flow and approval tests are complete.
+
+
+## Secure action gateway (initial dry-run milestone)
+
+The API now includes `POST /v1/actions/evaluate` and a pure decision layer that
+binds an approval to the exact workspace, actor, action payload and idempotency
+key. Expired, mismatched or missing approval evidence is rejected.
+
+**Important:** this is a policy-evaluation milestone, not an execution service.
+The endpoint does not execute tools or side effects. It is not ready for public
+exposure until authentication, trusted server-side approval lookup, audit
+persistence, rate limits and a separately sandboxed executor are integrated.
