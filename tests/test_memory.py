@@ -36,6 +36,7 @@ def test_memory_search_query_strips_search_operators_and_limits_terms() -> None:
 
 def test_saved_memory_can_be_disabled_by_request_or_user_instruction() -> None:
     assert not should_use_saved_memory("Continue without saved memories")
+    assert not should_use_saved_memory("Do not use memory for this task")
     assert not should_use_saved_memory("Use no memory for this task")
     assert not should_use_saved_memory("Research GST", enabled=False)
     assert should_use_saved_memory("Continue my GST project")
