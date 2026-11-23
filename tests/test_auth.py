@@ -6,6 +6,8 @@ import pytest
 from fastapi import HTTPException
 
 from charvi_api.auth import AuthSettings, verify_supabase_access_token
+from charvi_api.main import app
+from fastapi.testclient import TestClient
 
 
 def test_supabase_auth_returns_verified_identity() -> None:
@@ -71,3 +73,8 @@ def test_auth_service_failure_fails_closed() -> None:
         assert error.value.status_code == 503
 
     asyncio.run(scenario())
+
+
+def test_protected_identity_route_rejects_missing_bearer_token() -> None:
+    response = TestClient(app).get("/v1/me")
+    assert response.status_code == 401
