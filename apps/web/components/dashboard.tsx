@@ -140,7 +140,9 @@ export function Dashboard({ initialEmail }: { initialEmail: string | null }) {
   const [history, setHistory] = useState<Array<{ role: string; content: string }>>([]);
   const [historyTitle, setHistoryTitle] = useState("");
   const [voiceLanguage, setVoiceLanguage] = useState("en-IN");
+  const [voiceId, setVoiceId] = useState("af_heart");
   const [voiceStatus, setVoiceStatus] = useState("");
+  const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const [theme, setTheme] = useState<"dark" | "light">("dark");
@@ -152,6 +154,33 @@ export function Dashboard({ initialEmail }: { initialEmail: string | null }) {
   useEffect(() => {
     return () => recognitionRef.current?.abort();
   }, []);
+
+  useEffect(() => {
+    if (!("speechSynthesis" in window)) return;
+    const refreshVoices = () => setAvailableVoices(window.speechSynthesis.getVoices());
+    refreshVoices();
+    window.speechSynthesis.addEventListener("voiceschanged", refreshVoices);
+    return () => window.speechSynthesis.removeEventListener("voiceschanged", refreshVoices);
+  }, []);
+
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem("charvi.voiceId");
+      if (saved && /^(af_(heart|bella|nicole)|bf_emma|hf_(alpha|beta))$/.test(saved)) {
+        setVoiceId(saved);
+      }
+    } catch {
+      // Voice preferences are optional; private browsing may disable local storage.
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("charvi.voiceId", voiceId);
+    } catch {
+      // Keep the current in-memory choice if browser storage is unavailable.
+    }
+  }, [voiceId]);
 
   useEffect(() => {
   if (!supabase) {
@@ -450,18 +479,69 @@ export function Dashboard({ initialEmail }: { initialEmail: string | null }) {
   recognition.start();
   }
 
-  function speakLastResponse() {
-  const text = lastResult?.coordinator?.output;
-  if (!text) return;
-  if (!("speechSynthesis" in window)) {
-    setVoiceStatus("Speech playback is not supported in this browser.");
-    return;
-  }
-  window.speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(text.slice(0, 4000));
-  utterance.lang = voiceLanguage;
-  window.speechSynthesis.speak(utterance);
-  setVoiceStatus("Reading Charvi's latest response.");
+  async function speakLastResponse() {
+    const text = lastResult?.coordinator?.output;
+    if (!text) return;
+
+    if (voiceLanguage !== "kn-IN") {
+      try {
+        if (!token || !API_BASE) throw new Error("Private voice service is not connected.");
+        const response = await fetch(`${API_BASE}/v1/voice/speak`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ text: text.slice(0, 4000), voice: voiceId }),
+          cache: "no-store",
+        });
+        if (response.ok) {
+          const audioBlob = await response.blob();
+          const audioUrl = URL.createObjectURL(audioBlob);
+          const audio = new Audio(audioUrl);
+          audio.onended = () => URL.revokeObjectURL(audioUrl);
+          audio.onerror = () => URL.revokeObjectURL(audioUrl);
+          await audio.play();
+          setVoiceStatus(`Speaking with Charvi's ${voiceId} feminine voice.`);
+          return;
+        }
+        if (response.status !== 503) {
+          throw new Error("Private voice service returned an error.");
+        }
+      } catch (reason) {
+        setVoiceStatus(
+          reason instanceof Error
+            ? `Using your device voice fallback. ${reason.message}`
+            : "Using your device voice fallback.",
+        );
+      }
+    } else {
+      setVoiceStatus("Kokoro does not currently offer Kannada; using an available device voice.");
+    }
+
+    if (!("speechSynthesis" in window)) {
+      setVoiceStatus("Speech playback is not supported in this browser.");
+      return;
+    }
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text.slice(0, 4000));
+    utterance.lang = voiceLanguage;
+    const languagePrefix = voiceLanguage.split("-")[0].toLowerCase();
+    const preferred = availableVoices.filter((voice) =>
+      voice.lang.toLowerCase().startsWith(languagePrefix),
+    );
+    const femaleName = /female|woman|samantha|victoria|karen|zira|susan|siri|aria|jenny|sonia|heera|priya|lekha|swara/i;
+    utterance.voice =
+      preferred.find((voice) => femaleName.test(voice.name)) ||
+      preferred[0] ||
+      availableVoices.find((voice) => femaleName.test(voice.name)) ||
+      null;
+    window.speechSynthesis.speak(utterance);
+    setVoiceStatus(
+      utterance.voice
+        ? `Reading with device voice: ${utterance.voice.name}. Availability depends on your device.`
+        : "Reading with the device's default voice; install a feminine voice in device settings for a closer match.",
+    );
   }
 
 
@@ -588,6 +668,17 @@ export function Dashboard({ initialEmail }: { initialEmail: string | null }) {
                       <option value="hi-IN">Hindi</option>
                     </select>
                   </label>
+                  <label className="voice-language">Charvi's voice
+                    <select value={voiceId} onChange={(event) => setVoiceId(event.target.value)}>
+                      <option value="af_heart">Heart — warm feminine English</option>
+                      <option value="af_bella">Bella — friendly feminine English</option>
+                      <option value="af_nicole">Nicole — clear feminine English</option>
+                      <option value="bf_emma">Emma — British feminine English</option>
+                      <option value="hf_alpha">Alpha — feminine Hindi</option>
+                      <option value="hf_beta">Beta — feminine Hindi</option>
+                    </select>
+                  </label>
+                  <span className="muted tiny">{availableVoices.length} device voices detected. Kokoro voices are used when the private voice worker is connected; otherwise Charvi selects an available device voice.</span>
                   <span className="muted tiny">{voiceStatus || "Browser speech recognition may use your browser or device speech provider."}</span>
                 </div>
 
