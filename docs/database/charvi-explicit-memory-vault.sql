@@ -44,3 +44,45 @@ with check (true);
 
 revoke all on table public.user_memories from service_role;
 grant select, insert, update on table public.user_memories to service_role;
+
+create or replace function private.enforce_user_memory_scope()
+returns trigger
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+    workspace_owner uuid;
+begin
+    select w.owner_id
+      into workspace_owner
+      from public.workspaces w
+     where w.id = new.workspace_id;
+
+    if workspace_owner is null or workspace_owner is distinct from new.owner_id then
+        raise exception 'Memory owner must match the workspace owner'
+            using errcode = '23514';
+    end if;
+
+    if new.source_run_id is not null and not exists (
+        select 1
+          from public.agent_runs r
+         where r.id = new.source_run_id
+           and r.workspace_id = new.workspace_id
+    ) then
+        raise exception 'Memory source run must belong to the same workspace'
+            using errcode = '23514';
+    end if;
+
+    return new;
+end;
+$$;
+
+revoke all on function private.enforce_user_memory_scope() from public, anon, authenticated, service_role;
+
+drop trigger if exists enforce_user_memory_scope on public.user_memories;
+create trigger enforce_user_memory_scope
+before insert or update of workspace_id, owner_id, source_run_id
+on public.user_memories
+for each row
+execute function private.enforce_user_memory_scope();
