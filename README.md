@@ -63,6 +63,7 @@ docs/
 
 - Supabase RLS and approval/audit schema are applied to the connected Charvi project.
 - Approval records store a verified requester identity, immutable payload hash and server-generated nonce. Database triggers enforce pending-to-decision transitions and write request/decision audit events.
+- LangGraph now supports thread-scoped checkpoint memory, owner/workspace-namespaced thread IDs, bounded conversation history, durable agent-run records and a resume endpoint. Durable checkpointing activates only after the server receives LANGGRAPH_POSTGRES_URI.
 - The API verifies Supabase Auth access tokens and derives the actor ID from the verified identity.
 - The API has owner-scoped workspace lookup, policy evaluation, approval creation/listing/decision routes and audit-event retrieval.
 - The policy allows read/draft work and reversible workspace writes without creating an approval request. Higher-impact categories are gated.
