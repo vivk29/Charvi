@@ -113,8 +113,9 @@ class CharviOrchestrator:
         rows.append({
             "id": "langgraph",
             "kind": "orchestration_framework",
-            "capabilities": ["stateful_workflows", "async_handoffs", "graph_execution"],
+            "capabilities": ["workflow_graph", "specialist_handoffs", "result_synthesis"],
             "configured": self._graph is not None,
+            "durable_checkpointing": False,
         })
         rows.append({
             "id": "openai",
