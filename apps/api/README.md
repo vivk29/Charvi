@@ -32,7 +32,7 @@ Browser Use runs in a separate container under apps/browser-worker; it is delibe
 2. Pull a model that fits the machine's RAM/VRAM. Do not choose a model size until hardware is known.
 3. Confirm Ollama responds locally at http://localhost:11434.
 4. Copy .env.example to .env and set:
-   - CHARVI_COORDINATOR_PROVIDER=ollama
+   - COORDINATOR_PROVIDER=ollama
    - OLLAMA_BASE_URL=http://host.docker.internal:11434/v1
    - OLLAMA_MODEL to the exact model tag installed in Ollama
 5. Start the Charvi API with Docker Compose and inspect GET /v1/agents.
@@ -41,7 +41,7 @@ For Linux, Compose adds host.docker.internal via host-gateway. Ollama must liste
 
 ## Optional paid coordinator
 
-To opt into OpenAI instead, set CHARVI_COORDINATOR_PROVIDER=openai, OPENAI_API_KEY and OPENAI_MODEL. API usage is billed separately from ChatGPT subscriptions. No OpenAI key is required when using Ollama.
+To opt into OpenAI instead, set COORDINATOR_PROVIDER=openai, OPENAI_API_KEY and OPENAI_MODEL. API usage is billed separately from ChatGPT subscriptions. No OpenAI key is required when using Ollama.
 
 ## Other runtime configuration
 
