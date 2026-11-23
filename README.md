@@ -51,7 +51,7 @@ docs/
 
 ## Current implementation status
 
-- Supabase security hardening and recovery/control-plane tables have been applied to the connected Charvi project.
+- Supabase security hardening, recovery/control-plane tables, and the database-backed approval/audit schema have been applied to the connected Charvi project.
 - This repository is being initialized with the control-plane security baseline.
 - Hermes deployment, API service, worker pairing, backups and restore automation are **not yet deployed**.
 
@@ -70,3 +70,10 @@ key. Expired, mismatched or missing approval evidence is rejected.
 The endpoint does not execute tools or side effects. It is not ready for public
 exposure until authentication, trusted server-side approval lookup, audit
 persistence, rate limits and a separately sandboxed executor are integrated.
+
+
+## Database-backed approval milestone
+
+The connected Supabase project now stores approval payload hashes and server-generated nonces, enforces immutable pending requests and one-way decisions, and automatically records request/decision events in a restricted audit table. See [the applied schema snapshot](docs/database/secure-approval-workflow.sql).
+
+This is database enforcement only: owner authentication, API routes to create/decide approvals, trusted approval retrieval in the gateway, and UI notifications are still pending.
