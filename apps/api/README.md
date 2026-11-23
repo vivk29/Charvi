@@ -58,6 +58,7 @@ The Next.js owner console calls this API with the signed-in user's Supabase acce
 
 - GET /v1/agents lists configured runtimes, orchestration and the selected coordinator provider.
 - POST /v1/agent-runs routes a request through the workforce, stores a durable run record and returns a thread_id.
+- POST /v1/workspaces creates an owner-scoped workspace.
 - POST /v1/workspaces/{workspace_id}/memories explicitly saves an owner-approved memory.
 - GET /v1/workspaces/{workspace_id}/memories lists active saved memories.
 - GET /v1/workspaces/{workspace_id}/memories/search?q=... searches saved memories.
