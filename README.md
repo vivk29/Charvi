@@ -9,7 +9,7 @@ Charvi is a voice-and-text personal AI operating system with one conversational 
 - **Orchestration:** LangGraph coordinates specialist workflows; it is not itself an AI model.
 - **Coordinator intelligence:** Ollama is the default local model provider. OpenAI is optional; Claude and Gemini are not required.
 - **Specialist agents:** OpenHands for approval-gated coding, Browser Use in a separate read-only browser worker, Hermes for general work, and OpenClaw as an optional isolated device runtime with owner approval required for device control. n8n is a planned workflow executor.
-- **Data plane:** Supabase PostgreSQL/Auth. RLS protects tenant data; privileged operations are restricted to trusted backend services.
+- **Data plane:** Supabase PostgreSQL/Auth. RLS protects tenant data; privileged operations are restricted to trusted backend services. LangGraph checkpoints are isolated in the non-exposed charvi_memory schema.
 - **Devices:** cloud-first; laptop worker connects outbound over authenticated TLS and receives narrowly scoped jobs.
 - **Clients:** web and mobile, with text and voice interaction.
 
@@ -66,9 +66,9 @@ docs/
 - The API verifies Supabase Auth access tokens and derives the actor ID from the verified identity.
 - The API has owner-scoped workspace lookup, policy evaluation, approval creation/listing/decision routes and audit-event retrieval.
 - The policy allows read/draft work and reversible workspace writes without creating an approval request. Higher-impact categories are gated.
-- The API, agent adapters and model-provider selection are source-controlled. The latest CI run passed before this provider milestone; this milestone still requires its own CI verification.
+- The API, agent adapters and model-provider selection are source-controlled. LangGraph's Postgres checkpoint integration, owner-scoped run history and resume endpoints are implemented in source. Configure LANGGRAPH_POSTGRES_URI before durable checkpoints become active.
 
-**Not yet live:** the API and agent runtimes are not deployed or configured with server-only Supabase credentials; no Charvi web/mobile interface, Hermes/OpenClaw/OpenHands services, Browser Use worker, laptop pairing, voice interface, notifications, backup automation or restore service is deployed. LangGraph routing is implemented but durable checkpoint persistence is not wired. The Ollama adapter is committed only after this milestone's changes are merged and CI passes; Ollama itself still needs to be installed and configured on the user's machine.
+**Not yet live:** the API and agent runtimes are not deployed or configured with server-only Supabase credentials; no Charvi web/mobile interface, Hermes/OpenClaw/OpenHands services, Browser Use worker, laptop pairing, voice interface, notifications, backup automation or restore service is deployed. Durable checkpoint code is committed, but the API still needs LANGGRAPH_POSTGRES_URI and a running deployment. Ollama itself still needs to be installed and configured on the user's machine.
 
 ## Local development
 
