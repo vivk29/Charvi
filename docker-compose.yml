@@ -61,3 +61,33 @@ services:
     pids_limit: 128
     mem_limit: 2g
     cpus: 2.0
+  whisper-worker:
+    profiles: ["voice"]
+    build:
+      context: .
+      dockerfile: apps/whisper-worker/Dockerfile
+    restart: unless-stopped
+    expose:
+      - "8095"
+    environment:
+      CHARVI_WHISPER_WORKER_TOKEN: ${WHISPER_WORKER_TOKEN:-}
+      WHISPER_MODEL_SIZE: ${WHISPER_MODEL_SIZE:-tiny}
+      WHISPER_DEVICE: cpu
+      WHISPER_COMPUTE_TYPE: int8
+      WHISPER_CPU_THREADS: ${WHISPER_CPU_THREADS:-4}
+      WHISPER_DOWNLOAD_ROOT: /models
+    volumes:
+      - whisper-model-cache:/models
+    read_only: true
+    tmpfs:
+      - /tmp:size=256m,noexec,nosuid
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 128
+    mem_limit: 2g
+    cpus: 2.0
+
+volumes:
+  whisper-model-cache:
