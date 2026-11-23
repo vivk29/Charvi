@@ -6,13 +6,22 @@ from uuid import UUID
 from fastapi import Depends, FastAPI, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from .agents import AgentSettings
 from .auth import UserIdentity, get_current_user
 from .gateway import GatewayRequest, authorize_gateway_request, payload_digest
+from .orchestrator import CharviOrchestrator
 from .policy import ActionCategory, ActionRequest, evaluate_action
 from .store import SupabaseRestStore, get_store
 
 CurrentUser = Annotated[UserIdentity, Depends(get_current_user)]
 Store = Annotated[SupabaseRestStore, Depends(get_store)]
+
+
+def get_orchestrator() -> CharviOrchestrator:
+    return CharviOrchestrator(AgentSettings())
+
+
+Orchestrator = Annotated[CharviOrchestrator, Depends(get_orchestrator)]
 
 app = FastAPI(
     title="Charvi Control Plane",
@@ -40,6 +49,12 @@ class ApprovalRequestInput(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     payload: dict[str, object] = Field(default_factory=dict)
     expires_in_minutes: int = Field(default=60, ge=5, le=10080)
+
+
+class AgentRunInput(BaseModel):
+    workspace_id: UUID
+    task: str = Field(min_length=1, max_length=12000)
+    context: str = Field(default="", max_length=20000)
 
 
 class ApprovalDecisionInput(BaseModel):
@@ -210,3 +225,42 @@ async def decide_approval(
     if result is None:
         raise HTTPException(status_code=409, detail="Approval was already decided; refresh and try again.")
     return result
+
+
+@app.get("/v1/agents", tags=["agents"])
+async def list_configured_agents(
+    user: CurrentUser,
+    orchestrator: Orchestrator,
+) -> list[dict[str, object]]:
+    return orchestrator.catalog()
+
+
+@app.post("/v1/agent-runs", tags=["agents"])
+async def run_agent_task(
+    payload: AgentRunInput,
+    user: CurrentUser,
+    store: Store,
+    orchestrator: Orchestrator,
+) -> dict[str, object]:
+    await owned_workspace(store, payload.workspace_id, user)
+    result = await orchestrator.run(task=payload.task, context=payload.context)
+    return {
+        "status": result.status,
+        "routed_to": list(result.routed_to),
+        "coordinator": {
+            "agent_id": result.coordinator.agent_id,
+            "status": result.coordinator.status,
+            "output": result.coordinator.output,
+            "error": result.coordinator.error,
+        },
+        "specialists": [
+            {
+                "agent_id": item.agent_id,
+                "status": item.status,
+                "output": item.output,
+                "error": item.error,
+            }
+            for item in result.specialists
+        ],
+        "execution_performed": False,
+    }
