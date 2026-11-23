@@ -233,7 +233,8 @@ def build_agent_registry(settings: AgentSettings | None = None) -> dict[str, Age
         registry["openclaw"] = OpenAICompatibleBackend(
             agent_id="openclaw", base_url=settings.openclaw_base_url,
             api_token=settings.openclaw_api_token, model=settings.openclaw_model,
-            capabilities=("device", "automation", "general"),
+            capabilities=("device", "general"),
+            execution_capable=True,
         )
     if settings.openhands_enabled and settings.openhands_base_url and settings.openhands_api_token:
         registry["openhands"] = OpenAICompatibleBackend(
@@ -256,6 +257,7 @@ def route_specialists(
     registry: dict[str, AgentBackend],
     *,
     allow_code_execution: bool = False,
+    allow_device_control: bool = False,
 ) -> list[str]:
     prompt = task.casefold()
     wanted: list[str] = []
@@ -267,8 +269,10 @@ def route_specialists(
         wanted.append("browser_research")
     if any(word in prompt for word in ("research", "compare", "analyse", "analyze", "latest", "find")):
         wanted.append("research")
-    if any(word in prompt for word in ("automate", "schedule", "workflow", "repeat")):
-        wanted.append("automation")
+    if any(word in prompt for word in (
+        "device", "smart home", "turn on", "turn off", "set thermostat", "control my",
+    )):
+        wanted.append("device")
     if not wanted:
         wanted.append("general")
 
@@ -278,6 +282,7 @@ def route_specialists(
             agent_id for agent_id, backend in registry.items()
             if capability in backend.capabilities
             and (agent_id != "openhands" or allow_code_execution)
+            and (agent_id != "openclaw" or allow_device_control)
         ]
         if candidates:
             selected.append(candidates[0])
@@ -296,8 +301,14 @@ async def run_specialists(
     registry: dict[str, AgentBackend],
     context: str = "",
     allow_code_execution: bool = False,
+    allow_device_control: bool = False,
 ) -> list[AgentResult]:
-    selected = route_specialists(task, registry, allow_code_execution=allow_code_execution)
+    selected = route_specialists(
+        task,
+        registry,
+        allow_code_execution=allow_code_execution,
+        allow_device_control=allow_device_control,
+    )
     if not selected:
         return []
     results = await asyncio.gather(
