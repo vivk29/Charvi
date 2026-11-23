@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Any, TypedDict
 
 from .agents import AgentResult, AgentSettings, build_agent_registry, run_specialists
-from .providers import build_coordinator
+from .providers import build_coordinator, coordinator_status
 
 
 @dataclass(frozen=True, slots=True)
@@ -83,6 +83,10 @@ class CharviOrchestrator:
         graph.add_edge("dispatch_specialists", "synthesize_result")
         graph.add_edge("synthesize_result", END)
         return graph.compile()
+
+    async def model_status(self) -> dict[str, Any]:
+        """Inspect provider readiness without generating text or spending API credits."""
+        return await coordinator_status(self.settings)
 
     def catalog(self) -> list[dict[str, Any]]:
         rows = [
