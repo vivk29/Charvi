@@ -269,10 +269,11 @@ async def run_agent_task(
         context=payload.context,
         allow_code_execution=allow_code_execution,
     )
-    code_execution_performed = any(
-        item.execution_performed and item.status == "completed"
+    openhands_invoked = any(
+        item.agent_id == "openhands" and item.status == "completed"
         for item in result.specialists
     )
+    code_execution_performed: bool | None = None if openhands_invoked else False
     return {
         "status": result.status,
         "routed_to": list(result.routed_to),
@@ -292,6 +293,8 @@ async def run_agent_task(
             }
             for item in result.specialists
         ],
+        "openhands_runtime_invoked": openhands_invoked,
+        "code_execution_possible": openhands_invoked,
         "code_execution_performed": code_execution_performed,
         "external_side_effects_performed": False,
     }
