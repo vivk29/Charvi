@@ -27,6 +27,7 @@ def test_openhands_is_disabled_until_explicitly_enabled_and_authenticated() -> N
         openhands_enabled=True,
     ))
     assert "openhands" in enabled
+    assert enabled["openhands"].auth_header == "X-Session-API-Key"
 
 
 def test_router_selects_openhands_only_when_execution_is_approved() -> None:
@@ -35,7 +36,7 @@ def test_router_selects_openhands_only_when_execution_is_approved() -> None:
         openhands_api_token="token",
         openhands_enabled=True,
     ))
-    assert "openhands" not in route_specialists("Build and test a mobile app", registry)
+    assert route_specialists("Build and test a mobile app", registry) == []
     assert route_specialists(
         "Build and test a mobile app", registry, allow_code_execution=True
     ) == ["openhands"]
