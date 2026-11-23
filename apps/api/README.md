@@ -82,6 +82,17 @@ The API initializes the official LangGraph AsyncPostgresSaver at startup. If the
 
 Checkpointing is short-term, thread-scoped workflow memory. Long-term memories live separately in public.user_memories and are saved only through the explicit owner-controlled memory API; Charvi does not silently promote every conversation into permanent memory. The API searches relevant saved memories for ordinary non-approval-bound tasks and injects them as untrusted reference context. Approval-bound execution skips memory augmentation so the approved task/context digest remains exact. Run history is stored separately in public.agent_runs. Approval-bound code/device execution is deliberately excluded from automatic resume; it requires a fresh approval. The API hashes user, workspace and client thread ID together before passing a thread ID to LangGraph, preventing cross-workspace thread collisions.
 
+## Long-term memory policy
+
+- A memory is saved only when the authenticated owner calls the save endpoint; Charvi does not silently turn every conversation into permanent memory.
+- Use a stable lowercase memory_key. Saving the same key in the same workspace updates that saved item.
+- Memory types are limited to preference, profile, project, workflow and reference.
+- Passwords, API keys and access tokens are rejected when they appear in obvious inline key/value form. This vault is not a secrets manager; do not store credentials or highly sensitive personal data.
+- Saved memories are workspace-scoped, full-text searchable and can be archived.
+- Ordinary non-approval-bound agent runs retrieve up to five relevant saved memories by default. Set use_saved_memory=false to opt out; natural-language requests such as "don't use memory" are also respected.
+- Approval-bound code/device execution skips memory augmentation so the approved task and context remain byte-for-byte aligned with the approval digest.
+- Memories are injected as untrusted reference data, never as tool instructions. The current user request takes precedence over a saved memory.
+
 ## Security boundary
 
 Specialist runtimes are untrusted workers. They receive only task/context explicitly passed to them. They do not receive Supabase service credentials, owner tokens, or direct access to Charvi's permission database. External content is untrusted data, not instructions. OpenHands execution is approval-gated; Browser Use is intended for read-only browsing; device, financial, messaging, deployment and destructive actions remain behind Charvi's own policy and approval gateway.
