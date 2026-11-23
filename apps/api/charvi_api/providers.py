@@ -77,6 +77,75 @@ class UnconfiguredCoordinatorBackend:
         )
 
 
+async def coordinator_status(settings: AgentSettings) -> dict[str, Any]:
+    """Return safe provider diagnostics without making a billable model-generation call."""
+    provider = settings.coordinator_provider.strip().lower()
+    if provider == "ollama":
+        configured = bool(settings.ollama_base_url and settings.ollama_model)
+        result: dict[str, Any] = {
+            "provider": "ollama",
+            "local": True,
+            "subscription_required": False,
+            "configured": configured,
+            "reachable": False if configured else None,
+            "model": settings.ollama_model or None,
+            "model_available": False if configured else None,
+        }
+        if not configured:
+            result["message"] = "Set OLLAMA_BASE_URL and OLLAMA_MODEL."
+            return result
+        headers = {}
+        if settings.ollama_api_key:
+            headers["Authorization"] = f"Bearer {settings.ollama_api_key}"
+        try:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(5.0)) as client:
+                response = await client.get(
+                    f"{settings.ollama_base_url.rstrip('/')}/models",
+                    headers=headers,
+                )
+                response.raise_for_status()
+                payload = response.json()
+            model_ids = [
+                item.get("id")
+                for item in payload.get("data", [])
+                if isinstance(item, dict) and isinstance(item.get("id"), str)
+            ]
+            result["reachable"] = True
+            result["model_available"] = settings.ollama_model in model_ids
+            result["available_models"] = model_ids
+            result["message"] = (
+                "Ollama is reachable and the configured model is available."
+                if result["model_available"]
+                else "Ollama is reachable, but the configured model tag was not found."
+            )
+        except (httpx.HTTPError, TypeError, ValueError):
+            result["message"] = "Ollama could not be reached. Check the URL, service and network."
+        return result
+    if provider == "openai":
+        configured = bool(settings.openai_api_key and settings.openai_model)
+        return {
+            "provider": "openai",
+            "local": False,
+            "subscription_required": False,
+            "api_billing": True,
+            "configured": configured,
+            "reachable": None,
+            "model": settings.openai_model or None,
+            "model_available": None,
+            "message": "Configured status only; no billable probe was sent.",
+        }
+    return {
+        "provider": provider or "unknown",
+        "local": None,
+        "subscription_required": False,
+        "configured": False,
+        "reachable": None,
+        "model": None,
+        "model_available": None,
+        "message": "Unsupported coordinator provider.",
+    }
+
+
 def build_coordinator(settings: AgentSettings):
     """Select a coordinator provider without coupling the agent graph to that provider."""
     provider = settings.coordinator_provider.strip().lower()
