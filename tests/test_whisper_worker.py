@@ -3,7 +3,6 @@ import sys
 from pathlib import Path
 
 import pytest
-from fastapi import HTTPException
 
 
 WORKER_PATH = Path(__file__).parents[1] / "apps" / "whisper-worker" / "app.py"
@@ -21,7 +20,7 @@ def test_whisper_worker_accepts_matching_internal_token(monkeypatch: pytest.Monk
 
 def test_whisper_worker_rejects_invalid_internal_token(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("CHARVI_WHISPER_WORKER_TOKEN", "private-worker-token")
-    with pytest.raises(HTTPException) as error:
+    with pytest.raises(Exception) as error:
         WORKER.authorize_worker("wrong-token")
     assert error.value.status_code == 401
 
