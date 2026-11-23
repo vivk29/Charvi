@@ -6,7 +6,8 @@ Charvi is a voice-and-text personal AI operating system with one conversational 
 
 - **Charvi Core:** understands the owner's request, plans work, routes tasks to specialists and presents one coherent response.
 - **Control plane:** Python 3.12 + FastAPI. Owns identity, workspace access, action policy, approvals, audit events and task routing.
-- **Assistant runtime:** Hermes Agent, planned as an isolated runtime. Hermes is not the authorization authority.
+- **Orchestration:** LangGraph coordinates specialist workflows; it is not itself an AI model.
+- **Coordinator intelligence:** Ollama is the default local model provider. OpenAI is optional; Claude and Gemini are not required.
 - **Specialist agents:** OpenHands for approval-gated coding, Browser Use in a separate read-only browser worker, Hermes for general work, and OpenClaw as an optional isolated device runtime with owner approval required for device control. n8n is a planned workflow executor.
 - **Data plane:** Supabase PostgreSQL/Auth. RLS protects tenant data; privileged operations are restricted to trusted backend services.
 - **Devices:** cloud-first; laptop worker connects outbound over authenticated TLS and receives narrowly scoped jobs.
@@ -65,26 +66,25 @@ docs/
 - The API verifies Supabase Auth access tokens and derives the actor ID from the verified identity.
 - The API has owner-scoped workspace lookup, policy evaluation, approval creation/listing/decision routes and audit-event retrieval.
 - The policy allows read/draft work and reversible workspace writes without creating an approval request. Higher-impact categories are gated.
-- GitHub Actions lint and tests passed for the workspace-ownership code milestone.
+- The API, agent adapters and model-provider selection are source-controlled. The latest CI run passed before this provider milestone; this milestone still requires its own CI verification.
 
-**Not yet live:** the API and agent runtimes are not deployed or configured with server-only Supabase credentials; no Charvi web/mobile interface, Hermes/OpenClaw/OpenHands services, Browser Use worker, laptop pairing, voice interface, notifications, backup automation or restore service is deployed. LangGraph routing and agent adapters are committed, but no durable checkpoint store is wired yet. Approval decisions are recorded and validated, but a general-purpose action executor is not deployed.
+**Not yet live:** the API and agent runtimes are not deployed or configured with server-only Supabase credentials; no Charvi web/mobile interface, Hermes/OpenClaw/OpenHands services, Browser Use worker, laptop pairing, voice interface, notifications, backup automation or restore service is deployed. LangGraph routing is implemented but durable checkpoint persistence is not wired. The Ollama adapter is committed only after this milestone's changes are merged and CI passes; Ollama itself still needs to be installed and configured on the user's machine.
 
 ## Local development
 
-See [the API guide](apps/api/README.md) for environment variables and route documentation. Copy `.env.example` to a private local `.env` file and configure credentials there. Never commit actual credentials.
+See the API guide in apps/api/README.md. Copy .env.example to a private .env file and configure credentials there. Never commit actual credentials.
 
 The GitHub repository is currently public. Keep secrets, personal data, production exports and private configuration out of it.
 
+## Multi-agent and local model milestone
 
-## Multi-agent integration milestone
+Charvi has a unified agent registry and orchestration API:
 
-Charvi now has a unified agent registry and orchestration API:
-
-- OpenAI Responses API is the coordinating model adapter.
-- Hermes Agent and OpenClaw connect through their OpenAI-compatible chat-completions endpoints.
-- OpenHands connects to its Agent Server using its documented OpenAI-compatible endpoint and session-key authentication; code execution is disabled unless an exact-task-and-context approval is provided. Browser Use uses its native Python SDK inside a separate container, authenticated from the API with a dedicated worker token.
+- LangGraph coordinates specialist routing and result synthesis.
+- Ollama is the default coordinator model, using its OpenAI-compatible chat-completions endpoint. It can run locally without a premium chat subscription or per-token cloud provider bill.
+- OpenAI Responses API remains an explicitly selected optional provider; it is not required. Claude and Gemini are not dependencies.
+- Hermes and OpenClaw use compatible API adapters. OpenHands is approval-gated. Browser Use runs in a separate read-only worker.
 - The authenticated API exposes GET /v1/agents and POST /v1/agent-runs.
-- Task routing selects specialists by capability, runs selected specialists, and passes their results to OpenAI for synthesis when configured.
-- Specialist responses are treated as untrusted output. They cannot directly execute privileged actions through this integration.
+- Specialist responses are untrusted data and cannot grant themselves execution privileges.
 
-The adapters and routing code are committed. LangGraph is optional in the API image; Browser Use is a separate Compose worker (profile `browser`); OpenHands is an authenticated Agent Server adapter. These services are not live until separately deployed and configured. No credentials are stored in this repository.
+See docs/architecture/MODEL_PROVIDER_STRATEGY.md for local setup. A configured adapter does not mean the model or specialist service is deployed or reachable.
