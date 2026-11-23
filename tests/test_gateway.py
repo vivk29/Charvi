@@ -17,7 +17,10 @@ from charvi_api.store import get_store
 def client() -> TestClient:
     class WorkspaceStore:
         async def get_workspace(self, workspace_id: str, owner_id: str):
-            if owner_id == "00000000-0000-4000-8000-000000000001":
+            if (
+                owner_id == "00000000-0000-4000-8000-000000000001"
+                and workspace_id == "00000000-0000-4000-8000-000000000002"
+            ):
                 return {"id": workspace_id, "owner_id": owner_id}
             return None
 
