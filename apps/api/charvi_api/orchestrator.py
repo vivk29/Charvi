@@ -55,11 +55,11 @@ class CharviOrchestrator:
 
         async def dispatch(state: _RunState) -> dict[str, Any]:
             previous_history = state.get("history", [])[:-1]
-            history_context = "\\n".join(
+            history_context = "\n".join(
                 f"{message['role']}: {message['content']}"
                 for message in previous_history
             )
-            specialist_context = "\\n\\n".join(
+            specialist_context = "\n\n".join(
                 part for part in (state.get("context", ""), history_context) if part
             )
             results = await run_specialists(
@@ -80,8 +80,13 @@ class CharviOrchestrator:
                 f"[{item.agent_id} — {item.status}]\n{item.output or item.error or 'No result'}"
                 for item in specialists
             )
+            previous_history = state.get("history", [])[:-1]
+            history_context = "\n".join(
+                f"{message['role']}: {message['content']}"
+                for message in previous_history
+            )
             combined_context = "\n\n".join(
-                part for part in (state.get("context", ""), specialist_context) if part
+                part for part in (state.get("context", ""), history_context, specialist_context) if part
             )
             result = await self.coordinator.invoke(task=state["task"], context=combined_context)
             if result.status != "completed":
@@ -195,7 +200,7 @@ class CharviOrchestrator:
             "context": context,
             "allow_code_execution": allow_code_execution,
             "allow_device_control": allow_device_control,
-            "history": [{"role": "user", "content": task + ("\\n\\n" + context if context else "")}],
+            "history": [{"role": "user", "content": task + ("\n\n" + context if context else "")}],
         }
         if self._graph is not None:
             config = {"configurable": {"thread_id": thread_id}} if thread_id else None
