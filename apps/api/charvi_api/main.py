@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 from .agents import AgentSettings
 from .auth import UserIdentity, get_current_user
 from .gateway import GatewayRequest, authorize_gateway_request, payload_digest
+from .memory import build_memory_context, is_safe_memory_content
 from .orchestrator import CharviOrchestrator
 from .policy import ActionCategory, ActionRequest, evaluate_action
 from .store import SupabaseRestStore, get_store
@@ -127,6 +128,15 @@ class AgentRunInput(BaseModel):
 class ApprovalDecisionInput(BaseModel):
     decision: Literal["approved", "rejected", "cancelled"]
     note: str | None = Field(default=None, max_length=2000)
+
+
+class MemoryCreateInput(BaseModel):
+    memory_key: str = Field(min_length=1, max_length=160, pattern=r"^[a-z0-9][a-z0-9._-]*$")
+    title: str = Field(min_length=1, max_length=160)
+    content: str = Field(min_length=1, max_length=4000)
+    memory_type: Literal["preference", "profile", "project", "workflow", "reference"]
+    confidence: float = Field(default=1.0, ge=0.0, le=1.0)
+    source_run_id: UUID | None = None
 
 
 def risk_for(category: ActionCategory, reversible: bool = False) -> str:
@@ -294,6 +304,86 @@ async def decide_approval(
     return result
 
 
+@app.post(
+    "/v1/workspaces/{workspace_id}/memories",
+    tags=["memory"],
+    status_code=201,
+)
+async def save_memory(
+    workspace_id: UUID,
+    payload: MemoryCreateInput,
+    user: CurrentUser,
+    store: Store,
+) -> dict[str, object]:
+    await owned_workspace(store, workspace_id, user)
+    if not is_safe_memory_content(payload.content):
+        raise HTTPException(
+            status_code=422,
+            detail="Memory cannot contain obvious passwords, API keys or access tokens.",
+        )
+    if payload.source_run_id is not None:
+        source_run = await store.get_agent_run(str(payload.source_run_id))
+        if source_run is None or source_run.get("workspace_id") != str(workspace_id):
+            raise HTTPException(status_code=404, detail="Source run not found.")
+    now = datetime.now(UTC).isoformat()
+    return await store.upsert_memory({
+        "workspace_id": str(workspace_id),
+        "owner_id": user.user_id,
+        "memory_key": payload.memory_key,
+        "title": payload.title,
+        "content": payload.content,
+        "memory_type": payload.memory_type,
+        "source_run_id": str(payload.source_run_id) if payload.source_run_id else None,
+        "source_kind": "explicit_user",
+        "confidence": payload.confidence,
+        "status": "active",
+        "updated_at": now,
+    })
+
+
+@app.get("/v1/workspaces/{workspace_id}/memories", tags=["memory"])
+async def list_saved_memories(
+    workspace_id: UUID,
+    user: CurrentUser,
+    store: Store,
+) -> list[dict[str, object]]:
+    await owned_workspace(store, workspace_id, user)
+    return await store.list_memories(str(workspace_id), user.user_id)
+
+
+@app.get("/v1/workspaces/{workspace_id}/memories/search", tags=["memory"])
+async def search_saved_memories(
+    workspace_id: UUID,
+    user: CurrentUser,
+    store: Store,
+    q: str = Query(min_length=1, max_length=300),
+) -> list[dict[str, object]]:
+    await owned_workspace(store, workspace_id, user)
+    return await store.search_memories(str(workspace_id), user.user_id, q)
+
+
+@app.post(
+    "/v1/workspaces/{workspace_id}/memories/{memory_id}/archive",
+    tags=["memory"],
+)
+async def archive_saved_memory(
+    workspace_id: UUID,
+    memory_id: UUID,
+    user: CurrentUser,
+    store: Store,
+) -> dict[str, object]:
+    await owned_workspace(store, workspace_id, user)
+    result = await store.archive_memory(
+        str(memory_id),
+        str(workspace_id),
+        user.user_id,
+        updated_at=datetime.now(UTC).isoformat(),
+    )
+    if result is None:
+        raise HTTPException(status_code=404, detail="Active memory not found.")
+    return result
+
+
 @app.get("/v1/models/status", tags=["models"])
 async def coordinator_model_status(
     user: CurrentUser,
@@ -390,6 +480,21 @@ async def run_agent_task(
         allow_code_execution = action_category == ActionCategory.WRITE.value
         allow_device_control = action_category == ActionCategory.DEVICE_CONTROL.value
 
+    run_context = payload.context
+    memory_records: list[dict[str, object]] = []
+    if payload.approval_id is None:
+        memory_records = await store.search_memories(
+            str(payload.workspace_id),
+            user.user_id,
+            payload.task,
+            limit=5,
+        )
+        memory_context = build_memory_context(memory_records)
+        if memory_context:
+            run_context = "\n\n".join(
+                part for part in (payload.context, memory_context) if part
+            )
+
     external_thread_id = str(payload.thread_id or uuid4())
     internal_thread_id = checkpoint_thread_key(
         user.user_id, str(payload.workspace_id), external_thread_id
@@ -402,8 +507,9 @@ async def run_agent_task(
         "objective": payload.task,
         "input": {
             "task": payload.task,
-            "context": payload.context,
+            "context": run_context,
             "thread_id": external_thread_id,
+            "memory_ids": [str(item["id"]) for item in memory_records],
             "approval_id": str(payload.approval_id) if payload.approval_id else None,
         },
         "thread_id": external_thread_id,
@@ -414,7 +520,7 @@ async def run_agent_task(
     try:
         result = await orchestrator.run(
             task=payload.task,
-            context=payload.context,
+            context=run_context,
             allow_code_execution=allow_code_execution,
             allow_device_control=allow_device_control,
             thread_id=internal_thread_id,
@@ -424,6 +530,7 @@ async def run_agent_task(
             "run_id": run_id,
             "thread_id": external_thread_id,
             "checkpointing_enabled": orchestrator.checkpointing_enabled,
+            "memories_used": len(memory_records),
         })
         await store.update_agent_run(
             run_id,
