@@ -10,6 +10,6 @@ This optional worker provides self-hosted speech-to-text for dashboard voice rec
 - Requires a shared worker token; never exposes the worker port to the host.
 - Model files persist in the named `whisper-model-cache` Docker volume.
 
-The tiny model is a conservative first configuration because the laptop hardware has not yet been confirmed. Increase `WHISPER_MODEL_SIZE` only after testing memory and latency on the actual host.
+The tiny model is the selected baseline for a 4 GB RAM laptop without an NVIDIA GPU. It runs on CPU with INT8 and two CPU threads. The Compose worker is capped at 1 GB RAM and 1.5 CPUs. This is a best-effort local configuration, not a promise of real-time transcription; long recordings may be slow or hit the memory cap. Keep the Browser Use and Kokoro workers off on this laptop, and avoid running Whisper alongside several other heavy development containers. For regular voice use, move transcription to a separate cloud worker or use the device/browser dictation fallback.
 
 Start with `docker compose --profile transcription up -d --build` after setting `WHISPER_WORKER_TOKEN` in the API `.env`. The API passes only the worker token and model settings to this container; it does not pass Supabase or model-provider secrets.
