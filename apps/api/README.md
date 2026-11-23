@@ -33,7 +33,7 @@ Browser Use runs in a separate container under `apps/browser-worker`; it is deli
 
 ## Runtime configuration
 
-Copy `.env.example` to a private `.env` and configure only the services you have deployed. Never commit API keys or service tokens.
+Copy `.env.example` to a private `.env` and configure only the services you have deployed. For the browser worker, copy `browser-worker.env.example` to a separate private `browser-worker.env`; do not put its Browser Use provider key in the API `.env`. Never commit API keys or service tokens.
 
 - `HERMES_BASE_URL` should point to the Hermes OpenAI-compatible API base path (normally ending in `/v1`).
 - `OPENCLAW_BASE_URL` should point to the authenticated OpenClaw API base path.
