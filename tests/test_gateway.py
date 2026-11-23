@@ -1,3 +1,5 @@
+from fastapi.testclient import TestClient
+
 from charvi_api.gateway import (
     ApprovalBinding,
     GatewayRequest,
@@ -6,7 +8,6 @@ from charvi_api.gateway import (
 )
 from charvi_api.main import app
 from charvi_api.policy import ActionCategory, ActionRequest
-from fastapi.testclient import TestClient
 
 
 client = TestClient(app)
