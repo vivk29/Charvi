@@ -38,7 +38,7 @@ class AgentResult:
     status: str
     output: str | None = None
     error: str | None = None
-    execution_performed: bool = False
+    execution_performed: bool | None = False
 
 
 class AgentBackend(Protocol):
@@ -60,6 +60,7 @@ class OpenAICompatibleBackend:
         model: str,
         capabilities: tuple[str, ...],
         execution_capable: bool = False,
+        auth_header: str = "Authorization",
         timeout_seconds: float = 90.0,
     ):
         self.agent_id = agent_id
@@ -68,12 +69,16 @@ class OpenAICompatibleBackend:
         self.model = model
         self.capabilities = capabilities
         self.execution_capable = execution_capable
+        self.auth_header = auth_header
         self.timeout_seconds = timeout_seconds
 
     async def invoke(self, *, task: str, context: str) -> AgentResult:
         headers = {"Content-Type": "application/json"}
         if self.api_token:
-            headers["Authorization"] = f"Bearer {self.api_token}"
+            headers[self.auth_header] = (
+                f"Bearer {self.api_token}" if self.auth_header == "Authorization"
+                else self.api_token
+            )
         body = {
             "model": self.model,
             "stream": False,
@@ -104,7 +109,7 @@ class OpenAICompatibleBackend:
                 self.agent_id,
                 "completed",
                 output=output,
-                execution_performed=self.execution_capable,
+                execution_performed=None if self.execution_capable else False,
             )
         except (httpx.HTTPError, KeyError, IndexError, TypeError, ValueError) as exc:
             return AgentResult(
@@ -256,6 +261,7 @@ def build_agent_registry(settings: AgentSettings | None = None) -> dict[str, Age
             model=settings.openhands_model or "default",
             capabilities=("coding", "debugging", "testing"),
             execution_capable=True,
+            auth_header="X-Session-API-Key",
             timeout_seconds=300.0,
         )
     # Register Browser Use as a read-only specialist. Its SDK and browser runtime are
