@@ -88,7 +88,8 @@ async def transcribe(
     worker_token: Annotated[str | None, Header(alias="X-Charvi-Worker-Token")] = None,
 ) -> TranscriptionResult:
     authorize_worker(worker_token)
-    if file.content_type not in ALLOWED_TYPES:
+    media_type = (file.content_type or "").split(";", maxsplit=1)[0].lower()
+    if media_type not in ALLOWED_TYPES:
         raise HTTPException(status_code=415, detail="Unsupported audio format.")
     content = await file.read(MAX_AUDIO_BYTES + 1)
     if not content:
@@ -96,7 +97,7 @@ async def transcribe(
     if len(content) > MAX_AUDIO_BYTES:
         raise HTTPException(status_code=413, detail="Audio must be 20 MB or smaller.")
 
-    suffix = EXTENSIONS.get(file.content_type) or mimetypes.guess_extension(file.content_type) or ".audio"
+    suffix = EXTENSIONS.get(media_type) or mimetypes.guess_extension(media_type) or ".audio"
     temp_path: str | None = None
     try:
         with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as temporary:
