@@ -2,8 +2,8 @@ import importlib.util
 import sys
 from pathlib import Path
 
-from fastapi import HTTPException
 import pytest
+from fastapi import HTTPException
 
 
 WORKER_PATH = Path(__file__).parents[1] / "apps" / "whisper-worker" / "app.py"
