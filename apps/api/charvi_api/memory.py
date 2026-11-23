@@ -29,7 +29,7 @@ def should_use_saved_memory(task: str, enabled: bool = True) -> bool:
     if not enabled:
         return False
     return re.search(
-        r"\b(?:don't|do not|never|without|ignore|forget|no)\b.{0,50}\b(?:saved )?memories?\b",
+        r"\b(?:don't|do not|never|without|ignore|forget|no)\b.{0,50}\b(?:saved )?memor(?:y|ies)\b",
         task,
         re.IGNORECASE,
     ) is None
