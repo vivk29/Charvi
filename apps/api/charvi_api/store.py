@@ -76,6 +76,17 @@ class SupabaseRestStore:
             raise HTTPException(status_code=502, detail="The database returned an invalid response.") from exc
         return data if isinstance(data, list) else []
 
+    async def create_workspace(self, record: dict[str, Any]) -> dict[str, Any]:
+        rows = await self._request(
+            "POST", "workspaces",
+            params={"select": "id,name,slug,created_at,updated_at"},
+            body=record,
+            prefer="return=representation",
+        )
+        if not rows:
+            raise HTTPException(status_code=502, detail="The workspace was not created.")
+        return rows[0]
+
     async def list_workspaces(self, owner_id: str) -> list[dict[str, Any]]:
         return await self._request(
             "GET", "workspaces",
