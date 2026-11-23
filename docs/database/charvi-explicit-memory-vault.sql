@@ -34,3 +34,13 @@ create index user_memories_search_vector_idx
     on public.user_memories using gin (search_vector);
 create index user_memories_owner_workspace_idx
     on public.user_memories (owner_id, workspace_id);
+
+create policy "Backend service role manages owner-scoped memories"
+on public.user_memories
+for all
+to service_role
+using (true)
+with check (true);
+
+revoke all on table public.user_memories from service_role;
+grant select, insert, update on table public.user_memories to service_role;
