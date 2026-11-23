@@ -1,29 +1,38 @@
 # Charvi
 
-Charvi is a voice-and-text personal AI operating system with a cloud control plane and an owner-connected laptop worker.
+Charvi is a voice-and-text personal AI operating system with one conversational assistant coordinating specialist agents behind the scenes.
 
 ## Architecture
 
-- **Control plane:** Python 3.12 + FastAPI. Owns authentication boundaries, policy evaluation, approvals, audit events, task routing and provider adapters.
-- **Assistant runtime:** Hermes Agent, deployed as an isolated worker. Hermes is an execution runtime, not the authorization authority.
-- **Data plane:** Supabase PostgreSQL/Auth. RLS protects tenant data; privileged execution writes happen through trusted backend services only.
-- **Recovery:** immutable action history, idempotent runs, Git checkpoints, object-storage snapshots and tested restore procedures.
-- **Specialist integrations:** OpenHands (coding), Browser Use (browser automation), n8n (workflow automation), optional OpenClaw (isolated evaluation only).
+- **Charvi Core:** understands the owner's request, plans work, routes tasks to specialists and presents one coherent response.
+- **Control plane:** Python 3.12 + FastAPI. Owns identity, workspace access, action policy, approvals, audit events and task routing.
+- **Assistant runtime:** Hermes Agent, planned as an isolated runtime. Hermes is not the authorization authority.
+- **Specialist agents:** OpenHands for coding, Browser Use for browser work, n8n for workflows, and additional research, finance/business and device specialists as integrations mature.
+- **Data plane:** Supabase PostgreSQL/Auth. RLS protects tenant data; privileged operations are restricted to trusted backend services.
 - **Devices:** cloud-first; laptop worker connects outbound over authenticated TLS and receives narrowly scoped jobs.
 - **Clients:** web and mobile, with text and voice interaction.
+
+## Autonomy and approval defaults
+
+Charvi should not ask for approval for every small step. Its policy is designed around risk and configured scope:
+
+- Read, research, analysis and drafting: autonomous within authorised scopes.
+- Reversible changes inside Charvi's isolated workspace: autonomous under the current starter policy.
+- External messages, financial actions, destructive changes, production deployments, credential access and sensitive device controls: owner approval.
+- Low-impact device actions can become autonomous only after explicit device pairing and capability configuration.
+
+Approval is bound to the exact action payload/hash, target, actor, workspace and expiry. A changed payload requires a new approval. Approval is a gate, not proof that an action was executed.
 
 ## Non-negotiable security defaults
 
 1. Deny by default. Every action is classified and evaluated by Charvi's policy service before execution.
-2. Low-risk read/research actions may run automatically within explicit scopes.
-3. External messages, financial actions, destructive changes, production deployments, credential access and sensitive device controls require owner approval.
-4. Approval is bound to the exact action payload/hash, target, actor, expiry and run. Any material change requires a new approval.
-5. Execution runs in isolated containers with non-root users, resource limits, restricted network egress and scoped mounts.
-6. No Supabase service-role key, model key, OAuth refresh token or device secret in browser/mobile code, Git, logs or agent prompts.
-7. Device pairing is explicit, revocable and capability-scoped. Never expose the laptop worker's local control port to the public internet.
-8. External content is untrusted input. Prompt injection cannot grant new permissions.
-9. Every execution has an idempotency key, audit trail, timeout and recovery checkpoint where applicable.
-10. Backups are encrypted, access-controlled and periodically restore-tested.
+2. The backend derives identity from a verified Supabase Auth token; agents cannot supply or impersonate the owner identity.
+3. Workspace ownership is checked before workspace or approval access.
+4. Privileged database credentials stay on the server and never enter browser/mobile code, Git, logs or agent prompts.
+5. Device pairing is explicit, revocable and capability-scoped. Never expose the laptop worker's local control port to the public internet.
+6. External content is untrusted input. Prompt injection cannot grant new permissions.
+7. Every execution should have an idempotency key, audit trail, timeout and recovery checkpoint where applicable.
+8. Backups are encrypted, access-controlled and periodically restore-tested.
 
 ## Repository layout
 
@@ -51,36 +60,17 @@ docs/
 
 ## Current implementation status
 
-- Supabase security hardening, recovery/control-plane tables, and the database-backed approval/audit schema have been applied to the connected Charvi project.
-- This repository is being initialized with the control-plane security baseline.
-- Hermes deployment, API service, worker pairing, backups and restore automation are **not yet deployed**.
+- Supabase RLS and approval/audit schema are applied to the connected Charvi project.
+- Approval records store a verified requester identity, immutable payload hash and server-generated nonce. Database triggers enforce pending-to-decision transitions and write request/decision audit events.
+- The API verifies Supabase Auth access tokens and derives the actor ID from the verified identity.
+- The API has owner-scoped workspace lookup, policy evaluation, approval creation/listing/decision routes and audit-event retrieval.
+- The policy allows read/draft work and reversible workspace writes without creating an approval request. Higher-impact categories are gated.
+- GitHub Actions lint and tests passed for the workspace-ownership code milestone.
+
+**Not yet live:** the API is not deployed or configured with a server-only Supabase service-role key; no Charvi web/mobile interface, Hermes runtime, specialist agent orchestration, actual action executor, laptop pairing, voice interface, notifications, backup automation or restore service is deployed. Approval decisions are recorded, but the approved action is not executed by this API.
 
 ## Local development
 
-The first milestone will provide a minimal API health endpoint and policy primitives. Do not connect live device credentials or production accounts until the threat model, pairing flow and approval tests are complete.
+See [the API guide](apps/api/README.md) for environment variables and route documentation. Copy `.env.example` to a private local `.env` file and configure credentials there. Never commit actual credentials.
 
-
-## Secure action gateway (initial dry-run milestone)
-
-The API now includes `POST /v1/actions/evaluate` and a pure decision layer that
-binds an approval to the exact workspace, actor, action payload and idempotency
-key. Expired, mismatched or missing approval evidence is rejected.
-
-**Important:** this is a policy-evaluation milestone, not an execution service.
-The endpoint does not execute tools or side effects. It is not ready for public
-exposure until authentication, trusted server-side approval lookup, audit
-persistence, rate limits and a separately sandboxed executor are integrated.
-
-
-## Database-backed approval milestone
-
-The connected Supabase project now stores approval payload hashes and server-generated nonces, enforces immutable pending requests and one-way decisions, and automatically records request/decision events in a restricted audit table. See [the applied schema snapshot](docs/database/secure-approval-workflow.sql).
-
-This is database enforcement only: owner authentication, API routes to create/decide approvals, trusted approval retrieval in the gateway, and UI notifications are still pending.
-
-
-## Owner identity milestone
-
-The API now has a Supabase Auth verification dependency. Protected endpoints accept a Supabase bearer access token, ask the project's Auth service to validate it, and derive the actor ID from the verified user response rather than trusting an actor ID supplied in request JSON. The public `/health` endpoint remains available.
-
-The API uses only the project URL and publishable key for this verification step; no database secret or JWT signing secret is stored in the code. Workspace ownership checks and the authenticated approval decision endpoints are still pending, so this is not yet an execution-ready API.
+The GitHub repository is currently public. Keep secrets, personal data, production exports and private configuration out of it.
