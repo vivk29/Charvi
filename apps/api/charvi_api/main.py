@@ -13,7 +13,12 @@ from pydantic import BaseModel, Field
 from .agents import AgentSettings
 from .auth import UserIdentity, get_current_user
 from .gateway import GatewayRequest, authorize_gateway_request, payload_digest
-from .memory import build_memory_context, is_safe_memory_content, normalize_memory_query
+from .memory import (
+    build_memory_context,
+    is_safe_memory_content,
+    normalize_memory_query,
+    should_use_saved_memory,
+)
 from .orchestrator import CharviOrchestrator
 from .policy import ActionCategory, ActionRequest, evaluate_action
 from .store import SupabaseRestStore, get_store
@@ -123,6 +128,7 @@ class AgentRunInput(BaseModel):
     thread_id: UUID | None = None
     idempotency_key: str = Field(default_factory=lambda: str(uuid4()), min_length=1, max_length=128)
     approval_id: UUID | None = None
+    use_saved_memory: bool = True
 
 
 class ApprovalDecisionInput(BaseModel):
@@ -486,7 +492,9 @@ async def run_agent_task(
     run_context = payload.context
     memory_records: list[dict[str, object]] = []
     normalized_task_query = normalize_memory_query(payload.task)
-    if payload.approval_id is None and normalized_task_query:
+    if payload.approval_id is None and should_use_saved_memory(
+        payload.task, payload.use_saved_memory
+    ) and normalized_task_query:
         memory_records = await store.search_memories(
             str(payload.workspace_id),
             user.user_id,
