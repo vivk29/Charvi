@@ -111,7 +111,7 @@ Charvi can use the optional Kokoro-82M voice service for speech output. The API 
 To enable locally:
 
 1. Set `KOKORO_TTS_URL=http://voice-worker:7860` in the private API `.env`.
-2. Start the worker with `docker compose --profile voice up -d`.
+2. Start the worker with `docker compose --profile tts up -d`.
 3. Restart the API.
 4. In the dashboard, choose a feminine voice (default: `af_heart`) and press **Read response aloud**.
 
