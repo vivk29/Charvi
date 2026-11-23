@@ -9,7 +9,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     WHISPER_DOWNLOAD_ROOT=/models
 
 WORKDIR /app
-RUN useradd --create-home --uid 10003 whisper
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libgomp1 \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --create-home --uid 10003 whisper
 COPY apps/whisper-worker/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 COPY apps/whisper-worker/app.py ./app.py
