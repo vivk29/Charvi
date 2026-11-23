@@ -4,12 +4,12 @@ This module never executes actions or trusts approval claims supplied by an agen
 Approval evidence must be loaded from the trusted control-plane store in a later
 integration; until then, high-impact actions remain blocked.
 """
+import json
 from dataclasses import dataclass
 from enum import StrEnum
 from hashlib import sha256
-import json
 
-from .policy import ActionCategory, ActionRequest, PolicyDecision, evaluate_action
+from .policy import ActionRequest, PolicyDecision, evaluate_action
 
 
 class RiskLevel(StrEnum):
