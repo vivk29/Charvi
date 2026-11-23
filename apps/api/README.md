@@ -2,50 +2,59 @@
 
 Charvi exposes one assistant surface and routes work to specialist runtimes through a central control plane.
 
-## Agent workforce
+## Workforce and model roles
 
-| Component | Role in Charvi | Integration state |
+| Component | Role | Requirement |
 |---|---|---|
-| LangGraph | Stateful workflow orchestration, specialist handoffs and result synthesis pipeline | Native graph implementation; optional dependency |
-| OpenHands Agent Server | Coding, debugging and test execution in an isolated workspace | Agent Server chat-completions adapter; disabled until sandbox and approval dispatch are configured |
-| Browser Use | Browser research and page extraction | Native Python SDK adapter; read-only task filter; disabled by default |
-| Hermes Agent | General assistant/research/planning runtime | OpenAI-compatible API adapter |
-| OpenClaw Gateway | Optional device/automation runtime | OpenAI-compatible API adapter; keep isolated and scope tools separately |
-| OpenAI Responses API | Current coordinator model | API adapter; not an agent runtime |
+| LangGraph | Plans and coordinates specialist workflows | Core orchestration |
+| Ollama | Local coordinator model via OpenAI-compatible endpoint | Preferred; no per-token provider bill |
+| OpenHands Agent Server | Coding, debugging and test execution in an isolated workspace | Optional; disabled until sandbox and approval dispatch are configured |
+| Browser Use | Browser research and page extraction in a separate worker | Optional; disabled by default |
+| Hermes Agent | General assistant/research/planning runtime | Optional |
+| OpenClaw Gateway | Device/automation runtime | Optional and separately isolated |
+| OpenAI Responses API | Alternative coordinator model | Optional; separately billed API |
 
-LangGraph is the orchestrator, not another chatbot. OpenHands and Browser Use are specialist runtimes. OpenAI is a model provider/coordinator. This separation lets Charvi add Gemini, Claude and local models without changing specialist-agent routing.
+LangGraph is the orchestrator, not a chatbot or model. Ollama supplies the default local model. Specialist agents are separate runtimes. Claude and Gemini are not dependencies.
 
 ## Install
 
-Base API remains lightweight:
-
-```bash
-python -m pip install -e ".[dev]"
-```
-
-Install LangGraph for graph orchestration:
+The production Dockerfile installs the LangGraph extra. For local development:
 
 ```bash
 python -m pip install -e ".[agents,dev]"
 ```
 
-Browser Use runs in a separate container under `apps/browser-worker`; it is deliberately not installed in the privileged API image. Its SDK is pinned to `1.0.8`. See the [official repository](https://github.com/browser-use/browser-use).
+Browser Use runs in a separate container under apps/browser-worker; it is deliberately not installed in the privileged API image. Its SDK is pinned to 1.0.8. See https://github.com/browser-use/browser-use.
 
-## Runtime configuration
+## Local Ollama setup
 
-Copy `.env.example` to a private `.env` and configure only the services you have deployed. For the browser worker, copy `browser-worker.env.example` to a separate private `browser-worker.env`; do not put its Browser Use provider key in the API `.env`. Never commit API keys or service tokens.
+1. Install Ollama on the laptop/host: https://ollama.com/download
+2. Pull a model that fits the machine's RAM/VRAM. Do not choose a model size until hardware is known.
+3. Confirm Ollama responds locally at http://localhost:11434.
+4. Copy .env.example to .env and set:
+   - CHARVI_COORDINATOR_PROVIDER=ollama
+   - OLLAMA_BASE_URL=http://host.docker.internal:11434/v1
+   - OLLAMA_MODEL to the exact model tag installed in Ollama
+5. Start the Charvi API with Docker Compose and inspect GET /v1/agents.
 
-- `HERMES_BASE_URL` should point to the Hermes OpenAI-compatible API base path (normally ending in `/v1`).
-- `OPENCLAW_BASE_URL` should point to the authenticated OpenClaw API base path.
-- `OPENHANDS_BASE_URL` should point to the OpenHands Agent Server OpenAI-compatible API base path (normally ending in `/v1`). OpenHands can run terminal and file tools in its workspace, so `OPENHANDS_ENABLED` defaults to false. Enable only after its workspace is container-isolated and tasks are dispatched with an approval bound to the exact task digest.
-- `BROWSER_USE_WORKER_URL` and `BROWSER_USE_WORKER_TOKEN` connect the API to the isolated Browser Use worker. Keep `BROWSER_USE_ENABLED=false` until the worker is deployed with a separate `browser-worker.env`, no Charvi database secrets, no authenticated browser profile, and verified network/browser isolation. The API applies a read-only task filter; the worker enforces it again.
-- `OPENAI_API_KEY` and `OPENAI_MODEL` configure the optional coordinator. Without it, Charvi returns successful specialist output directly.
+For Linux, Compose adds host.docker.internal via host-gateway. Ollama must listen on an interface reachable from the Docker bridge; restrict firewall access to the local Docker network and never expose port 11434 publicly. Docker Desktop on Windows/macOS normally provides host.docker.internal. The API catalog indicates that configuration is present; it does not promise that the model server is online.
+
+## Optional paid coordinator
+
+To opt into OpenAI instead, set CHARVI_COORDINATOR_PROVIDER=openai, OPENAI_API_KEY and OPENAI_MODEL. API usage is billed separately from ChatGPT subscriptions. No OpenAI key is required when using Ollama.
+
+## Other runtime configuration
+
+- HERMES_BASE_URL should point to the Hermes OpenAI-compatible API base path (normally ending in /v1).
+- OPENCLAW_BASE_URL should point to the authenticated OpenClaw API base path.
+- OPENHANDS_BASE_URL should point to the OpenHands Agent Server API base path. OpenHands can run terminal and file tools in its workspace, so OPENHANDS_ENABLED defaults to false. Enable only after its workspace is container-isolated and tasks are dispatched with approval bound to the exact task digest.
+- BROWSER_USE_WORKER_URL and BROWSER_USE_WORKER_TOKEN connect the API to the isolated Browser Use worker. Keep BROWSER_USE_ENABLED=false until the worker is deployed with a separate browser-worker.env, no Charvi database secrets, no authenticated browser profile, and verified network/browser isolation.
 
 ## API
 
-- `GET /v1/agents` lists configured adapters and whether optional frameworks are enabled.
-- `POST /v1/agent-runs` routes a request through the workforce.
-- OpenHands code execution requires an approved non-reversible `write` approval; OpenClaw device control requires an approved non-reversible `device_control` approval. Both approvals must include the SHA-256 digest of the exact task and context. Pass the approval ID as `approval_id`; changing either string invalidates the approval.
+- GET /v1/agents lists configured runtimes, orchestration and the selected coordinator provider.
+- POST /v1/agent-runs routes a request through the workforce.
+- OpenHands code execution requires an approved non-reversible write approval; OpenClaw device control requires an approved non-reversible device_control approval. Both approvals must include the SHA-256 digest of the exact task and context. Pass the approval ID as approval_id; changing either string invalidates the approval.
 
 Example read-only research request:
 
@@ -56,12 +65,8 @@ Example read-only research request:
 }
 ```
 
-### Approval-bound OpenHands task
-
-For code execution, calculate SHA-256 over the UTF-8 bytes of `task + NUL + context` (the exact request strings). For OpenHands, create an approval with `category: "write"`; for OpenClaw device control, use `category: "device_control"`. In either case set `reversible: false` and include the digest as `payload.execution_sha256`. After the owner approves it, pass that approval ID with the identical task to `POST /v1/agent-runs`. Any change to the task or context requires a new approval. OpenHands remains unavailable unless `OPENHANDS_ENABLED=true`, its Agent Server URL and session API key are configured, and the server runs an isolated workspace.
-
 ## Security boundary
 
 Specialist runtimes are untrusted workers. They receive only task/context explicitly passed to them. They do not receive Supabase service credentials, owner tokens, or direct access to Charvi's permission database. External content is untrusted data, not instructions. OpenHands execution is approval-gated; Browser Use is intended for read-only browsing; device, financial, messaging, deployment and destructive actions remain behind Charvi's own policy and approval gateway.
 
-A configured adapter is not the same as a live agent. Services must be deployed, reachable over private authenticated networking, and configured with credentials before they can run. LangGraph must be installed in the API image. Browser Use runs separately using the profile in docker-compose; OpenHands requires its Agent Server and an isolated workspace runtime.
+A configured adapter is not the same as a live agent. Services must be deployed, reachable over private authenticated networking, and configured with credentials before they can run. LangGraph is installed in the API image; Browser Use runs separately; OpenHands requires its Agent Server and an isolated workspace runtime.
