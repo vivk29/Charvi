@@ -8,7 +8,8 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated, Literal
 from uuid import UUID, uuid4
 
-from fastapi import Depends, FastAPI, HTTPException, Query, Request
+import httpx
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -115,6 +116,15 @@ app.add_middleware(
 )
 
 
+class VoiceSynthesisInput(BaseModel):
+    text: str = Field(min_length=1, max_length=4000)
+    voice: Literal[
+        "af_heart", "af_bella", "af_nicole", "af_aoede", "af_kore",
+        "af_sarah", "af_nova", "bf_emma", "bf_isabella", "bf_alice",
+        "hf_alpha", "hf_beta",
+    ] = "af_heart"
+
+
 class WorkspaceCreateInput(BaseModel):
     name: str = Field(min_length=1, max_length=80)
 
@@ -184,6 +194,49 @@ async def owned_workspace(store: SupabaseRestStore, workspace_id: UUID, user: Us
         # Avoid revealing whether another user's workspace exists.
         raise HTTPException(status_code=404, detail="Workspace not found.")
     return workspace
+
+
+@app.post("/v1/voice/speak", tags=["voice"])
+async def synthesize_voice(
+    payload: VoiceSynthesisInput,
+    user: CurrentUser,
+) -> Response:
+    """Proxy speech generation through the private, optional Kokoro worker."""
+    del user  # A verified Charvi account is required before using the worker.
+    settings = AgentSettings()
+    if not settings.kokoro_tts_url:
+        raise HTTPException(
+            status_code=503,
+            detail="The private voice engine is not configured; use the browser voice fallback.",
+        )
+    try:
+        async with httpx.AsyncClient(
+            timeout=httpx.Timeout(settings.kokoro_tts_timeout_seconds)
+        ) as client:
+            result = await client.post(
+                f"{settings.kokoro_tts_url.rstrip('/')}/tts/generate",
+                json={
+                    "text": payload.text,
+                    "voice": payload.voice,
+                    "output_format": "mp3",
+                },
+            )
+            result.raise_for_status()
+    except httpx.TimeoutException as exc:
+        raise HTTPException(status_code=504, detail="Voice synthesis timed out.") from exc
+    except httpx.HTTPStatusError as exc:
+        logger.warning("Private voice worker returned HTTP %s", exc.response.status_code)
+        raise HTTPException(status_code=502, detail="Private voice synthesis failed.") from exc
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=503, detail="Private voice worker is unavailable.") from exc
+
+    if not result.content:
+        raise HTTPException(status_code=502, detail="Private voice worker returned empty audio.")
+    return Response(
+        content=result.content,
+        media_type=result.headers.get("content-type", "audio/mpeg"),
+        headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"},
+    )
 
 
 @app.get("/health", tags=["operations"])
