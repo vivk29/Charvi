@@ -229,6 +229,15 @@ async def decide_approval(
     return result
 
 
+@app.get("/v1/models/status", tags=["models"])
+async def coordinator_model_status(
+    user: CurrentUser,
+    orchestrator: Orchestrator,
+) -> dict[str, object]:
+    """Report local-model readiness without issuing a billable generation request."""
+    return await orchestrator.model_status()
+
+
 @app.get("/v1/agents", tags=["agents"])
 async def list_configured_agents(
     user: CurrentUser,
