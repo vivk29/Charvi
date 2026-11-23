@@ -45,7 +45,7 @@ services:
     mem_limit: 1536m
 
   voice-worker:
-    profiles: ["voice"]
+    profiles: ["tts"]
     image: hangrylabs/kokorotts:v0.2
     restart: unless-stopped
     expose:
@@ -62,7 +62,7 @@ services:
     mem_limit: 2g
     cpus: 2.0
   whisper-worker:
-    profiles: ["voice"]
+    profiles: ["transcription"]
     build:
       context: .
       dockerfile: apps/whisper-worker/Dockerfile
