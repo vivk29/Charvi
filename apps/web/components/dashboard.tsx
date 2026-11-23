@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 
@@ -139,6 +139,10 @@ export function Dashboard({ initialEmail }: { initialEmail: string | null }) {
 
   const [history, setHistory] = useState<Array<{ role: string; content: string }>>([]);
   const [historyTitle, setHistoryTitle] = useState("");
+  const [voiceLanguage, setVoiceLanguage] = useState("en-IN");
+  const [voiceStatus, setVoiceStatus] = useState("");
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
   const [theme, setTheme] = useState<"dark" | "light">("dark");
 
   useEffect(() => {
@@ -146,7 +150,84 @@ export function Dashboard({ initialEmail }: { initialEmail: string | null }) {
   }, [theme]);
 
   useEffect(() => {
-    if (!supabase) {
+    return () => recognitionRef.current?.abort();
+  }, []);
+
+  useEffect(() => {
+    function toggleVoiceInput() {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+      setVoiceStatus("Voice capture stopped.");
+      return;
+    }
+
+    const SpeechRecognitionApi =
+      window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognitionApi) {
+      setVoiceStatus("Voice dictation is not supported in this browser. You can still type your task.");
+      return;
+    }
+
+    const recognition = new SpeechRecognitionApi();
+    recognition.lang = voiceLanguage;
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
+    recognition.onresult = (event) => {
+      let finalTranscript = "";
+      let interimTranscript = "";
+      for (let index = event.resultIndex; index < event.results.length; index += 1) {
+        const transcript = event.results[index][0]?.transcript || "";
+        if (event.results[index].isFinal) finalTranscript += transcript;
+        else interimTranscript += transcript;
+      }
+      if (finalTranscript.trim()) {
+        setTask((current) =>
+          current.trim()
+            ? `${current.trim()} ${finalTranscript.trim()}`
+            : finalTranscript.trim(),
+        );
+      }
+      setVoiceStatus(
+        interimTranscript
+          ? `Listening: ${interimTranscript}`
+          : finalTranscript
+            ? "Speech added to your task."
+            : "Listening…",
+      );
+    };
+    recognition.onerror = (event) => {
+      setVoiceStatus(`Voice input error: ${event.error}`);
+      setIsListening(false);
+      recognitionRef.current = null;
+    };
+    recognition.onend = () => {
+      setIsListening(false);
+      recognitionRef.current = null;
+    };
+
+    recognitionRef.current = recognition;
+    setIsListening(true);
+    setVoiceStatus("Listening…");
+    recognition.start();
+  }
+
+  function speakLastResponse() {
+    const text = lastResult?.coordinator?.output;
+    if (!text) return;
+    if (!("speechSynthesis" in window)) {
+      setVoiceStatus("Speech playback is not supported in this browser.");
+      return;
+    }
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text.slice(0, 4000));
+    utterance.lang = voiceLanguage;
+    window.speechSynthesis.speak(utterance);
+    setVoiceStatus("Reading Charvi's latest response.");
+  }
+
+  if (!supabase) {
       setAuthLoading(false);
       return;
     }
@@ -495,10 +576,24 @@ export function Dashboard({ initialEmail }: { initialEmail: string | null }) {
               <form className="panel stack" onSubmit={submitTask}>
                 <label>What should Charvi do?<textarea value={task} onChange={(event) => setTask(event.target.value)} rows={3} maxLength={12000} placeholder="Research, analyse, build or organise something…" required /></label>
                 <label>Additional context <textarea value={taskContext} onChange={(event) => setTaskContext(event.target.value)} rows={2} maxLength={20000} placeholder="Optional context or instructions" /></label>
+                <div className="voice-controls">
+                  <button className="quiet" type="button" onClick={toggleVoiceInput} disabled={isListening && !recognitionRef.current}>
+                    {isListening ? "Stop listening" : "🎙 Dictate task"}
+                  </button>
+                  <label className="voice-language">Speech language
+                    <select value={voiceLanguage} onChange={(event) => setVoiceLanguage(event.target.value)}>
+                      <option value="en-IN">English (India)</option>
+                      <option value="kn-IN">Kannada</option>
+                      <option value="hi-IN">Hindi</option>
+                    </select>
+                  </label>
+                  <span className="muted tiny">{voiceStatus || "Browser speech recognition may use your browser or device speech provider."}</span>
+                </div>
+
                 <div className="form-row"><label className="check-label"><input type="checkbox" checked={useMemory} onChange={(event) => setUseMemory(event.target.checked)} /> Use relevant saved memories</label><button className="primary" disabled={taskBusy || !task.trim()}>{taskBusy ? "Working…" : "Send to Charvi"}</button></div>
                 {threadId && <p className="muted tiny">Continuing thread: {threadId} <button className="text-button" type="button" onClick={() => setThreadId("")}>Start new thread</button></p>}
               </form>
-              {lastResult && <article className="panel result-panel"><div className="card-top"><strong>Latest response</strong><span className={statusClass(lastResult.status)}>{lastResult.status}</span></div><p>{lastResult.coordinator?.output || lastResult.coordinator?.error || "No response text returned."}</p><small className="muted">Run {lastResult.run_id} · {lastResult.memories_used ?? 0} memories used</small></article>}
+              {lastResult && <article className="panel result-panel"><div className="card-top"><strong>Latest response</strong><span className={statusClass(lastResult.status)}>{lastResult.status}</span></div><p>{lastResult.coordinator?.output || lastResult.coordinator?.error || "No response text returned."}</p><div className="form-row"><small className="muted">Run {lastResult.run_id} · {lastResult.memories_used ?? 0} memories used</small>{lastResult.coordinator?.output && <button className="quiet" type="button" onClick={speakLastResponse}>Read response aloud</button>}</div></article>}
             </section>
 
             <section id="memories" className="section-block">
