@@ -27,7 +27,7 @@ def test_checkpointed_graph_persists_state_for_a_thread() -> None:
     assert snapshot.values["coordinator"]["agent_id"] == "ollama"
 
 
-def test_completed_thread_has_no_pending_resume_work() -> None:
+def test_completed_thread_can_recover_its_saved_result() -> None:
     memory_module = pytest.importorskip("langgraph.checkpoint.memory")
     checkpointer = memory_module.InMemorySaver()
     orchestrator = CharviOrchestrator(AgentSettings(), checkpointer=checkpointer)
@@ -36,7 +36,9 @@ def test_completed_thread_has_no_pending_resume_work() -> None:
         await orchestrator.run(task="Complete a normal run", thread_id="thread-complete")
         return await orchestrator.resume(thread_id="thread-complete")
 
-    assert asyncio.run(scenario()) is None
+    recovered = asyncio.run(scenario())
+    assert recovered is not None
+    assert recovered.coordinator.agent_id == "ollama"
 
 
 def test_catalog_reports_durable_checkpointing_only_when_saver_is_supplied() -> None:
