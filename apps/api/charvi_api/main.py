@@ -256,11 +256,17 @@ async def run_agent_task(
         if expiry and datetime.fromisoformat(expiry) <= datetime.now(UTC):
             raise HTTPException(status_code=409, detail="Execution approval has expired.")
         approved_payload = approval.get("payload") or {}
-        task_digest = hashlib.sha256(payload.task.encode("utf-8")).hexdigest()
-        if approved_payload.get("task_sha256") != task_digest:
+        if approval.get("action_category") != ActionCategory.WRITE.value:
+            raise HTTPException(status_code=409, detail="Approval is not a workspace-write approval.")
+        if approved_payload.get("reversible") is not False:
+            raise HTTPException(status_code=409, detail="OpenHands requires an explicitly non-reversible execution approval.")
+        execution_digest = hashlib.sha256(
+            f"{payload.task}\0{payload.context}".encode("utf-8")
+        ).hexdigest()
+        if approved_payload.get("execution_sha256") != execution_digest:
             raise HTTPException(
                 status_code=409,
-                detail="Approval does not match this exact task. Create a new approval for the revised task.",
+                detail="Approval does not match this exact task and context. Create a new approval for the revised request.",
             )
         allow_code_execution = True
 
