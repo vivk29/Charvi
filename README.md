@@ -74,3 +74,17 @@ docs/
 See [the API guide](apps/api/README.md) for environment variables and route documentation. Copy `.env.example` to a private local `.env` file and configure credentials there. Never commit actual credentials.
 
 The GitHub repository is currently public. Keep secrets, personal data, production exports and private configuration out of it.
+
+
+## Multi-agent integration milestone
+
+Charvi now has a unified agent registry and orchestration API:
+
+- OpenAI Responses API is the coordinating model adapter.
+- Hermes Agent and OpenClaw connect through their OpenAI-compatible chat-completions endpoints.
+- Optional OpenHands and Browser Use integrations can be connected through a secured OpenAI-compatible service bridge; these are not direct native SDK integrations yet.
+- The authenticated API exposes GET /v1/agents and POST /v1/agent-runs.
+- Task routing selects specialists by capability, runs selected specialists, and passes their results to OpenAI for synthesis when configured.
+- Specialist responses are treated as untrusted output. They cannot directly execute privileged actions through this integration.
+
+The integration code is committed and GitHub Actions lint and tests pass. The services are not live yet: runtime URLs, private tokens and an OpenAI API key/model must be configured in the API hosting environment. No credentials are stored in this repository.
