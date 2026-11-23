@@ -132,3 +132,12 @@ The optional Whisper worker transcribes short dashboard recordings locally in th
 The browser sends audio to the authenticated Charvi API. The API forwards it to the isolated worker using a separate token. Audio is held in temporary files only during transcription and removed after processing. The worker receives no Supabase or model-provider credentials, and its port is not published to the host.
 
 The model size is deliberately configurable. The faster-whisper project documents CPU INT8 execution and reports materially lower memory use than its FP32 configuration; actual speed depends on the host CPU. Do not switch to a larger model until measuring the laptop's RAM and latency.
+
+
+## Vercel FastAPI deployment
+
+The monorepo exposes the control plane through the root `api/index.py` entrypoint, configured by `[tool.vercel].entrypoint` in the root `pyproject.toml`. The API is deployed as a Python FastAPI function; the Next.js owner console is a separate Vercel project rooted at `apps/web`.
+
+Configure these values as server-only environment variables on the `charvi-api` Vercel project: `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `LANGGRAPH_POSTGRES_URI`, and `CORS_ALLOWED_ORIGINS`. Never put the service-role key or Postgres URI in the web project or any `NEXT_PUBLIC_*` variable. The web project needs only `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, and `NEXT_PUBLIC_CHARVI_API_URL`.
+
+The API's serverless deployment is suitable for authenticated HTTP control-plane requests. Long-running agent workers, browser automation, Whisper and Kokoro remain separate services; do not run those heavyweight processes inside the request function. Confirm the selected function region and test the deployed endpoints before enabling any execution-capable specialist.
