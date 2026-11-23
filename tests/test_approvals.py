@@ -108,7 +108,7 @@ def test_low_impact_draft_does_not_create_approval(client):
 
 
 def test_owner_can_approve_and_audit_decision(client):
-    test_client, fake_store = client
+    test_client, _fake_store = client
     created = test_client.post(
         f"/v1/workspaces/{WORKSPACE_ID}/approvals",
         json={
