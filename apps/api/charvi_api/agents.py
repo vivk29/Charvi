@@ -181,7 +181,7 @@ class BrowserUseSDKBackend:
             return AgentResult(self.agent_id, "completed", output=output)
         except TimeoutError:
             return AgentResult(self.agent_id, "timeout", error="Browser Use exceeded its time limit.")
-        except Exception as exc:  # SDK errors must not crash the control-plane request.
+        except Exception as exc:  # noqa: BLE001 - isolate third-party SDK failures.
             return AgentResult(
                 self.agent_id, "unavailable",
                 error=f"{type(exc).__name__}: Browser Use request failed.",
