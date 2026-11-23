@@ -9,7 +9,7 @@ from typing import Annotated, Literal
 from uuid import UUID, uuid4
 
 import httpx
-from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -194,6 +194,70 @@ async def owned_workspace(store: SupabaseRestStore, workspace_id: UUID, user: Us
         # Avoid revealing whether another user's workspace exists.
         raise HTTPException(status_code=404, detail="Workspace not found.")
     return workspace
+
+
+@app.post("/v1/voice/transcribe", tags=["voice"])
+async def transcribe_voice(
+    file: Annotated[UploadFile, File()],
+    user: CurrentUser,
+    language: Annotated[Literal["en", "hi", "kn"] | None, Form()] = None,
+) -> dict[str, object]:
+    """Proxy a short recording to Charvi's private Whisper worker."""
+    del user
+    settings = AgentSettings()
+    if not settings.whisper_worker_url or not settings.whisper_worker_token:
+        raise HTTPException(
+            status_code=503,
+            detail="Private Whisper transcription is not configured.",
+        )
+    allowed_types = {
+        "audio/webm", "audio/ogg", "audio/wav", "audio/x-wav",
+        "audio/mpeg", "audio/mp4", "audio/aac", "audio/flac",
+    }
+    if file.content_type not in allowed_types:
+        raise HTTPException(status_code=415, detail="Unsupported audio format.")
+    content = await file.read(20 * 1024 * 1024 + 1)
+    if not content:
+        raise HTTPException(status_code=400, detail="The audio recording is empty.")
+    if len(content) > 20 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Audio must be 20 MB or smaller.")
+    try:
+        async with httpx.AsyncClient(
+            timeout=httpx.Timeout(settings.whisper_worker_timeout_seconds)
+        ) as client:
+            result = await client.post(
+                f"{settings.whisper_worker_url.rstrip('/')}/v1/transcribe",
+                headers={"X-Charvi-Worker-Token": settings.whisper_worker_token},
+                files={
+                    "file": (
+                        file.filename or "charvi-recording.webm",
+                        content,
+                        file.content_type,
+                    )
+                },
+                data={"language": language or ""},
+            )
+            result.raise_for_status()
+            data = result.json()
+    except httpx.TimeoutException as exc:
+        raise HTTPException(status_code=504, detail="Private transcription timed out.") from exc
+    except httpx.HTTPStatusError as exc:
+        logger.warning("Private Whisper worker returned HTTP %s", exc.response.status_code)
+        raise HTTPException(status_code=502, detail="Private transcription failed.") from exc
+    except (httpx.HTTPError, ValueError) as exc:
+        raise HTTPException(status_code=503, detail="Private Whisper worker is unavailable.") from exc
+    finally:
+        await file.close()
+
+    transcript = data.get("text")
+    if not isinstance(transcript, str):
+        raise HTTPException(status_code=502, detail="Private transcription returned invalid data.")
+    return {
+        "text": transcript,
+        "language": data.get("language"),
+        "language_probability": data.get("language_probability"),
+        "duration_seconds": data.get("duration_seconds"),
+    }
 
 
 @app.post("/v1/voice/speak", tags=["voice"])
