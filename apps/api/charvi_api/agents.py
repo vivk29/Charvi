@@ -12,6 +12,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class AgentSettings(BaseSettings):
     coordinator_provider: str = "ollama"
+    cors_allowed_origins: str = "http://localhost:3000"
     langgraph_postgres_uri: str = ""
     ollama_base_url: str = ""
     ollama_model: str = ""
