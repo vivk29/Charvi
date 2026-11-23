@@ -1,10 +1,10 @@
+from charvi_api.auth import UserIdentity, get_current_user
 from charvi_api.gateway import (
     ApprovalBinding,
     GatewayRequest,
     authorize_gateway_request,
     payload_digest,
 )
-from charvi_api.auth import UserIdentity, get_current_user
 from charvi_api.main import app
 from charvi_api.policy import ActionCategory, ActionRequest
 from fastapi.testclient import TestClient
