@@ -533,14 +533,13 @@ export function Dashboard({ initialEmail }: { initialEmail: string | null }) {
     const femaleName = /female|woman|samantha|victoria|karen|zira|susan|siri|aria|jenny|sonia|heera|priya|lekha|swara/i;
     utterance.voice =
       preferred.find((voice) => femaleName.test(voice.name)) ||
-      preferred[0] ||
       availableVoices.find((voice) => femaleName.test(voice.name)) ||
       null;
     window.speechSynthesis.speak(utterance);
     setVoiceStatus(
       utterance.voice
         ? `Reading with device voice: ${utterance.voice.name}. Availability depends on your device.`
-        : "Reading with the device's default voice; install a feminine voice in device settings for a closer match.",
+        : "No feminine device voice was detected. Install/select a feminine voice in your operating system's speech settings.",
     );
   }
 
@@ -662,14 +661,23 @@ export function Dashboard({ initialEmail }: { initialEmail: string | null }) {
                     {isListening ? "Stop listening" : "🎙 Dictate task"}
                   </button>
                   <label className="voice-language">Speech language
-                    <select value={voiceLanguage} onChange={(event) => setVoiceLanguage(event.target.value)}>
+                    <select value={voiceLanguage} onChange={(event) => {
+                      const language = event.target.value;
+                      setVoiceLanguage(language);
+                      if (language === "hi-IN") setVoiceId("hf_alpha");
+                      if (language === "en-IN") setVoiceId("af_heart");
+                    }}>
                       <option value="en-IN">English (India)</option>
                       <option value="kn-IN">Kannada</option>
                       <option value="hi-IN">Hindi</option>
                     </select>
                   </label>
                   <label className="voice-language">Charvi's voice
-                    <select value={voiceId} onChange={(event) => setVoiceId(event.target.value)}>
+                    <select value={voiceId} onChange={(event) => {
+                      const selected = event.target.value;
+                      setVoiceId(selected);
+                      setVoiceLanguage(selected.startsWith("hf_") ? "hi-IN" : "en-IN");
+                    }}>
                       <option value="af_heart">Heart — warm feminine English</option>
                       <option value="af_bella">Bella — friendly feminine English</option>
                       <option value="af_nicole">Nicole — clear feminine English</option>
