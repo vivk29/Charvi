@@ -1,4 +1,5 @@
 import hashlib
+import logging
 import os
 import time
 from contextlib import asynccontextmanager
@@ -15,6 +16,8 @@ from .gateway import GatewayRequest, authorize_gateway_request, payload_digest
 from .orchestrator import CharviOrchestrator
 from .policy import ActionCategory, ActionRequest, evaluate_action
 from .store import SupabaseRestStore, get_store
+
+logger = logging.getLogger(__name__)
 
 CurrentUser = Annotated[UserIdentity, Depends(get_current_user)]
 Store = Annotated[SupabaseRestStore, Depends(get_store)]
@@ -62,7 +65,7 @@ async def lifespan(application: FastAPI):
                 await connection.execute(
                     f"ALTER TABLE charvi_memory.{table} ENABLE ROW LEVEL SECURITY"
                 )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             if connection is not None:
                 await connection.close()
             raise RuntimeError(
@@ -439,8 +442,8 @@ async def run_agent_task(
                 error_summary=type(exc).__name__,
                 finished_at=datetime.now(UTC).isoformat(),
             )
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception:
+            logger.exception("Could not persist the failed state for agent run %s", run_id)
         raise
 
 
