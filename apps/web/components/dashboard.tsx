@@ -65,14 +65,14 @@ async function apiRequest<T>(
     throw new Error("Set NEXT_PUBLIC_CHARVI_API_URL in apps/web/.env.local.");
   }
 
+  const headers = new Headers(init.headers);
+  headers.set("Authorization", `Bearer ${token}`);
+  headers.set("Content-Type", "application/json");
+
   const response = await fetch(`${API_BASE}${path}`, {
     ...init,
     cache: "no-store",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-      ...init.headers,
-    },
+    headers,
   });
 
   const payload: unknown = await response.json().catch(() => null);
@@ -464,7 +464,7 @@ export function Dashboard({ initialEmail }: { initialEmail: string | null }) {
         ) : (
           <>
             <section id="overview" className="stats-grid">
-              <article className="stat-card"><span className="muted">Connected agents</span><strong>{agents.filter((agent) => agent.configured).length}</strong><small>{agents.length} listed in registry</small></article>
+              <article className="stat-card"><span className="muted">Configured agents</span><strong>{agents.filter((agent) => agent.configured).length}</strong><small>{agents.length} listed in registry</small></article>
               <article className="stat-card"><span className="muted">Saved memories</span><strong>{memories.length}</strong><small>Owner-controlled facts</small></article>
               <article className="stat-card"><span className="muted">Recent runs</span><strong>{runs.length}</strong><small>Latest 50 tasks</small></article>
               <article className="stat-card"><span className="muted">Pending approvals</span><strong>{approvals.length}</strong><small>Owner decisions required</small></article>
@@ -480,7 +480,7 @@ export function Dashboard({ initialEmail }: { initialEmail: string | null }) {
               <div className="agent-grid">
                 {agents.map((agent) => (
                   <article className="agent-card" key={agent.id}>
-                    <div className="card-top"><strong>{agent.id.replaceAll("_", " ")}</strong><span className={statusClass(agent.configured)}>{agent.configured ? "Ready" : "Setup needed"}</span></div>
+                    <div className="card-top"><strong>{agent.id.replaceAll("_", " ")}</strong><span className={statusClass(agent.configured)}>{agent.configured ? "Configured" : "Setup needed"}</span></div>
                     <p className="muted tiny">{agent.kind.replaceAll("_", " ")}</p>
                     <p className="tiny">{agent.capabilities?.slice(0, 3).join(" · ") || "Agent capability registry"}</p>
                     {agent.durable_checkpointing !== undefined && <small className="muted">Durable checkpoints: {agent.durable_checkpointing ? "on" : "waiting for database URI"}</small>}
