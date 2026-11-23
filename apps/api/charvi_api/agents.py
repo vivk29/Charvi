@@ -125,8 +125,8 @@ class BrowserUseSDKBackend:
     capabilities = ("browser_research", "web_extraction", "website_qa")
 
     _blocked = re.compile(
-        r"\\b(book|purchase|buy|pay|checkout|submit|send|post|delete|cancel|"
-        r"change password|reset password|upload|transfer money)\\b",
+        r"\b(book|purchase|buy|pay|checkout|submit|send|post|delete|cancel|"
+        r"change password|reset password|upload|transfer money)\b",
         re.IGNORECASE,
     )
 
