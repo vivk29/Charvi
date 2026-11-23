@@ -31,6 +31,9 @@ class GatewayRequest:
 class ApprovalBinding:
     """Trusted approval record shape; callers must load it server-side."""
 
+    approval_id: str
+    approval_nonce: str
+    status: str
     workspace_id: str
     actor_id: str
     payload_sha256: str
@@ -88,6 +91,10 @@ def authorize_gateway_request(
     if approval is None:
         return GatewayDecision(False, True, digest, policy.reason)
 
+    if approval.status != "approved":
+        return GatewayDecision(False, True, digest, "Approval is not in the approved state.")
+    if not approval.approval_id.strip() or not approval.approval_nonce.strip():
+        return GatewayDecision(False, True, digest, "Approval record identity is incomplete.")
     if approval.workspace_id != request.workspace_id:
         return GatewayDecision(False, True, digest, "Approval workspace does not match.")
     if approval.actor_id != request.actor_id:
