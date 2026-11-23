@@ -4,7 +4,7 @@ Updated: 2026-11-23
 
 ## Implement now
 
-1. **LangGraph** — central orchestration graph. Use it for explicit, inspectable task stages, retries/checkpoints and human approval handoffs. It should not be treated as a worker with unrestricted tools.
+1. **LangGraph** — central orchestration graph. Use it for explicit, inspectable task stages and specialist handoffs. The current graph is request-scoped; durable checkpoint persistence, retries and resumable approval handoffs are follow-on work. It should not be treated as a worker with unrestricted tools.
 2. **OpenHands Software Agent SDK / Agent Server** — coding worker for repository changes, debugging and tests. Run its Agent Server in an ephemeral Docker/Kubernetes workspace. Charvi calls its OpenAI-compatible Agent Server API; it does not run OpenHands code inside the FastAPI process.
 3. **Browser Use** — browser research worker using the open-source Python SDK. Keep it read-only by default and isolate browser profiles, downloads and network access. Do not enable transactions or form submission through this adapter.
 4. **Hermes Agent** — general-purpose assistant runtime, accessed through its API.
