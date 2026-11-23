@@ -1,4 +1,5 @@
 import time
+from typing import Annotated
 
 from fastapi import Depends, FastAPI
 from pydantic import BaseModel, Field
@@ -6,6 +7,9 @@ from pydantic import BaseModel, Field
 from .auth import UserIdentity, get_current_user
 from .gateway import GatewayRequest, authorize_gateway_request
 from .policy import ActionCategory, ActionRequest
+
+CurrentUser = Annotated[UserIdentity, Depends(get_current_user)]
+
 
 app = FastAPI(
     title="Charvi Control Plane",
@@ -30,7 +34,7 @@ async def health() -> dict[str, str]:
 
 
 @app.get("/v1/me", tags=["identity"])
-async def current_identity(user: UserIdentity = Depends(get_current_user)) -> dict[str, str | None]:
+async def current_identity(user: CurrentUser) -> dict[str, str | None]:
     """Return the verified Supabase Auth identity, not caller-supplied identity data."""
     return {"user_id": user.user_id, "email": user.email}
 
@@ -38,7 +42,7 @@ async def current_identity(user: UserIdentity = Depends(get_current_user)) -> di
 @app.post("/v1/actions/evaluate", tags=["security"])
 async def evaluate_action_request(
     payload: ActionEvaluationInput,
-    user: UserIdentity = Depends(get_current_user),
+    user: CurrentUser,
 ) -> dict[str, object]:
     """Authenticated dry-run policy evaluation only; never executes an action.
 
