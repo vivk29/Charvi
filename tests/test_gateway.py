@@ -1,3 +1,5 @@
+import pytest
+
 from charvi_api.auth import UserIdentity, get_current_user
 from charvi_api.gateway import (
     ApprovalBinding,
@@ -8,7 +10,6 @@ from charvi_api.gateway import (
 from charvi_api.main import app
 from charvi_api.policy import ActionCategory, ActionRequest
 from fastapi.testclient import TestClient
-import pytest
 
 
 @pytest.fixture
