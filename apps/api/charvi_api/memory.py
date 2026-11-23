@@ -17,8 +17,22 @@ def is_safe_memory_content(content: str) -> bool:
 
 def normalize_memory_query(query: str) -> str:
     """Strip web-search operators and keep only plain searchable terms."""
-    terms = re.findall(r"[A-Za-z0-9]+", query)
+    terms = [
+        term for term in re.findall(r"[A-Za-z0-9]+", query)
+        if term.lower() not in {"and", "or", "not"}
+    ]
     return " ".join(terms[:20])[:200]
+
+
+def should_use_saved_memory(task: str, enabled: bool = True) -> bool:
+    """Respect both an explicit API opt-out and natural-language opt-out."""
+    if not enabled:
+        return False
+    return re.search(
+        r"\\b(?:don't|do not|never|without|ignore)\\b.{0,50}\\b(?:saved )?memories?\\b",
+        task,
+        re.IGNORECASE,
+    ) is None
 
 
 def build_memory_context(memories: list[dict[str, Any]]) -> str:
