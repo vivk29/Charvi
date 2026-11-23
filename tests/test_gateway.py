@@ -31,6 +31,9 @@ def test_high_impact_action_is_blocked_without_approval() -> None:
 def test_exact_unexpired_approval_binding_allows_policy_gated_action() -> None:
     request = make_request()
     approval = ApprovalBinding(
+        approval_id="approval-1",
+        approval_nonce="nonce-1",
+        status="approved",
         workspace_id="workspace-1",
         actor_id="agent-1",
         payload_sha256=payload_digest(request),
@@ -65,6 +68,9 @@ def test_changed_payload_invalidates_approval() -> None:
 def test_wrong_workspace_invalidates_approval() -> None:
     request = make_request()
     approval = ApprovalBinding(
+        approval_id="approval-2",
+        approval_nonce="nonce-2",
+        status="approved",
         workspace_id="other-workspace",
         actor_id="agent-1",
         payload_sha256=payload_digest(request),
@@ -78,6 +84,9 @@ def test_wrong_workspace_invalidates_approval() -> None:
 def test_expired_approval_is_rejected() -> None:
     request = make_request()
     approval = ApprovalBinding(
+        approval_id="approval-3",
+        approval_nonce="nonce-3",
+        status="approved",
         workspace_id="workspace-1",
         actor_id="agent-1",
         payload_sha256=payload_digest(request),
@@ -111,3 +120,21 @@ def test_http_evaluation_endpoint_never_executes_action() -> None:
     assert response.json()["allowed_to_execute"] is False
     assert response.json()["approval_required"] is True
     assert response.json()["execution_performed"] is False
+
+
+
+def test_pending_database_approval_is_not_execution_authority() -> None:
+    request = make_request()
+    approval = ApprovalBinding(
+        approval_id="approval-pending",
+        approval_nonce="nonce-pending",
+        status="pending",
+        workspace_id="workspace-1",
+        actor_id="agent-1",
+        payload_sha256=payload_digest(request),
+        approved_by="owner-1",
+        expires_at_epoch=200,
+    )
+    decision = authorize_gateway_request(request, approval=approval, now_epoch=100)
+    assert decision.allowed_to_execute is False
+    assert "approved state" in decision.reason
