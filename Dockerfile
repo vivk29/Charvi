@@ -7,7 +7,7 @@ WORKDIR /app
 RUN useradd --create-home --uid 10001 charvi
 COPY pyproject.toml README.md ./
 COPY apps/api ./apps/api
-RUN pip install --no-cache-dir fastapi uvicorn[standard] pydantic pydantic-settings
+RUN pip install --no-cache-dir ".[agents]"
 ENV PYTHONPATH=/app/apps/api
 USER 10001:10001
 EXPOSE 8000
