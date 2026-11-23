@@ -4,12 +4,17 @@ from charvi_api.gateway import (
     authorize_gateway_request,
     payload_digest,
 )
+from charvi_api.auth import UserIdentity, get_current_user
 from charvi_api.main import app
 from charvi_api.policy import ActionCategory, ActionRequest
 from fastapi.testclient import TestClient
 
 
 client = TestClient(app)
+app.dependency_overrides[get_current_user] = lambda: UserIdentity(
+    user_id="00000000-0000-4000-8000-000000000001",
+    email="owner@example.test",
+)
 
 
 def make_request(category: ActionCategory = ActionCategory.FINANCIAL) -> GatewayRequest:
@@ -110,7 +115,6 @@ def test_http_evaluation_endpoint_never_executes_action() -> None:
         "/v1/actions/evaluate",
         json={
             "workspace_id": "workspace-1",
-            "actor_id": "agent-1",
             "category": "financial",
             "target": "payment-destination",
             "description": "Create payment",
@@ -122,6 +126,7 @@ def test_http_evaluation_endpoint_never_executes_action() -> None:
     assert response.json()["allowed_to_execute"] is False
     assert response.json()["approval_required"] is True
     assert response.json()["execution_performed"] is False
+    assert response.json()["actor_id"] == "00000000-0000-4000-8000-000000000001"
 
 
 
