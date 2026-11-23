@@ -1,6 +1,7 @@
 """Server-only Supabase Data API access for the Charvi control plane."""
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import quote
 
@@ -135,11 +136,13 @@ class SupabaseRestStore:
         started_at: str | None = None,
         finished_at: str | None = None,
     ) -> dict[str, Any] | None:
-        body: dict[str, Any] = {"status": status, "updated_at": __import__("datetime").datetime.now(__import__("datetime").UTC).isoformat()}
+        body: dict[str, Any] = {
+            "status": status,
+            "updated_at": datetime.now(UTC).isoformat(),
+            "error_summary": error_summary,
+        }
         if result is not None:
             body["result"] = result
-        if error_summary is not None:
-            body["error_summary"] = error_summary
         if started_at is not None:
             body["started_at"] = started_at
         if finished_at is not None:
