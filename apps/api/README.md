@@ -45,7 +45,7 @@ Copy `.env.example` to a private `.env` and configure only the services you have
 
 - `GET /v1/agents` lists configured adapters and whether optional frameworks are enabled.
 - `POST /v1/agent-runs` routes a request through the workforce.
-- OpenHands code execution requires an already-approved approval record whose payload includes the SHA-256 digest of the exact task. The approval ID is passed as `approval_id`; changing the task invalidates the approval.
+- OpenHands code execution requires an approved non-reversible `write` approval; OpenClaw device control requires an approved non-reversible `device_control` approval. Both approvals must include the SHA-256 digest of the exact task and context. Pass the approval ID as `approval_id`; changing either string invalidates the approval.
 
 Example read-only research request:
 
@@ -58,7 +58,7 @@ Example read-only research request:
 
 ### Approval-bound OpenHands task
 
-For code execution, calculate SHA-256 over the UTF-8 bytes of `task + NUL + context` (the exact request strings). Create an approval with `category: "write"`, `reversible: false`, and include the digest as `payload.execution_sha256`. After the owner approves it, pass that approval ID with the identical task to `POST /v1/agent-runs`. Any change to the task or context requires a new approval. OpenHands remains unavailable unless `OPENHANDS_ENABLED=true`, its Agent Server URL and session API key are configured, and the server runs an isolated workspace.
+For code execution, calculate SHA-256 over the UTF-8 bytes of `task + NUL + context` (the exact request strings). For OpenHands, create an approval with `category: "write"`; for OpenClaw device control, use `category: "device_control"`. In either case set `reversible: false` and include the digest as `payload.execution_sha256`. After the owner approves it, pass that approval ID with the identical task to `POST /v1/agent-runs`. Any change to the task or context requires a new approval. OpenHands remains unavailable unless `OPENHANDS_ENABLED=true`, its Agent Server URL and session API key are configured, and the server runs an isolated workspace.
 
 ## Security boundary
 
