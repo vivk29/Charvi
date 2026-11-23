@@ -1,4 +1,5 @@
 import importlib.util
+import sys
 from pathlib import Path
 
 import pytest
@@ -9,6 +10,7 @@ WORKER_PATH = Path(__file__).parents[1] / "apps" / "whisper-worker" / "app.py"
 SPEC = importlib.util.spec_from_file_location("charvi_whisper_worker", WORKER_PATH)
 assert SPEC is not None and SPEC.loader is not None
 WORKER = importlib.util.module_from_spec(SPEC)
+sys.modules[SPEC.name] = WORKER
 SPEC.loader.exec_module(WORKER)
 
 
