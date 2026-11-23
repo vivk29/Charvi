@@ -57,7 +57,7 @@ async def verify_supabase_access_token(
     try:
         user = response.json()
         user_id = str(UUID(user["id"]))
-    except (ValueError, TypeError, KeyError):
+    except (ValueError, TypeError, KeyError, AttributeError):
         raise HTTPException(status_code=401, detail="Authentication response is invalid.") from None
 
     email = user.get("email")
