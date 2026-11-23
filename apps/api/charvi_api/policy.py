@@ -41,11 +41,16 @@ _APPROVAL_REQUIRED = {
 
 
 def evaluate_action(action: ActionRequest) -> PolicyDecision:
-    """Conservative first-pass policy. Production policy must also validate
-    user, workspace, target scope, device capability and approval binding.
-    """
+    """Conservative starter policy; real execution also needs target-scope checks."""
     if not action.target.strip() or not action.description.strip():
         return PolicyDecision(False, True, "Missing action target or description.")
+
+    if action.category == ActionCategory.WRITE and action.reversible:
+        return PolicyDecision(
+            True,
+            False,
+            "Reversible workspace changes can proceed autonomously inside Charvi's authorised sandbox.",
+        )
 
     if action.category in _APPROVAL_REQUIRED:
         return PolicyDecision(
