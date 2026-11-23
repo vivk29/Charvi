@@ -77,3 +77,10 @@ persistence, rate limits and a separately sandboxed executor are integrated.
 The connected Supabase project now stores approval payload hashes and server-generated nonces, enforces immutable pending requests and one-way decisions, and automatically records request/decision events in a restricted audit table. See [the applied schema snapshot](docs/database/secure-approval-workflow.sql).
 
 This is database enforcement only: owner authentication, API routes to create/decide approvals, trusted approval retrieval in the gateway, and UI notifications are still pending.
+
+
+## Owner identity milestone
+
+The API now has a Supabase Auth verification dependency. Protected endpoints accept a Supabase bearer access token, ask the project's Auth service to validate it, and derive the actor ID from the verified user response rather than trusting an actor ID supplied in request JSON. The public `/health` endpoint remains available.
+
+The API uses only the project URL and publishable key for this verification step; no database secret or JWT signing secret is stored in the code. Workspace ownership checks and the authenticated approval decision endpoints are still pending, so this is not yet an execution-ready API.
