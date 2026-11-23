@@ -43,3 +43,21 @@ services:
       - ALL
     pids_limit: 256
     mem_limit: 1536m
+
+  voice-worker:
+    profiles: ["voice"]
+    image: hangrylabs/kokorotts:v0.2
+    restart: unless-stopped
+    expose:
+      - "7860"
+    # The worker is reachable only on the private Compose network; no host port is published.
+    read_only: true
+    tmpfs:
+      - /tmp:size=256m,noexec,nosuid
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 128
+    mem_limit: 2g
+    cpus: 2.0
