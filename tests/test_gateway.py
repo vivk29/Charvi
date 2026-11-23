@@ -4,7 +4,12 @@ from charvi_api.gateway import (
     authorize_gateway_request,
     payload_digest,
 )
+from charvi_api.main import app
 from charvi_api.policy import ActionCategory, ActionRequest
+from fastapi.testclient import TestClient
+
+
+client = TestClient(app)
 
 
 def make_request(category: ActionCategory = ActionCategory.FINANCIAL) -> GatewayRequest:
@@ -86,3 +91,22 @@ def test_low_risk_read_can_be_evaluated_without_approval() -> None:
     decision = authorize_gateway_request(make_request(ActionCategory.READ), now_epoch=100)
     assert decision.allowed_to_execute is True
     assert decision.approval_required is False
+
+
+def test_http_evaluation_endpoint_never_executes_action() -> None:
+    response = client.post(
+        "/v1/actions/evaluate",
+        json={
+            "workspace_id": "workspace-1",
+            "actor_id": "agent-1",
+            "category": "financial",
+            "target": "payment-destination",
+            "description": "Create payment",
+            "reversible": False,
+            "idempotency_key": "task-123",
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["allowed_to_execute"] is False
+    assert response.json()["approval_required"] is True
+    assert response.json()["execution_performed"] is False
