@@ -3,10 +3,9 @@ from uuid import uuid4
 
 import httpx
 import pytest
-from fastapi import HTTPException
-
 from charvi_api.auth import AuthSettings, verify_supabase_access_token
 from charvi_api.main import app
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 
