@@ -40,7 +40,7 @@ Approval is bound to the exact action payload/hash, target, actor, workspace and
 ```
 apps/
   api/                 # FastAPI control plane
-  web/                 # Next.js owner console (planned)
+  web/                 # Next.js owner console (text-first dashboard implemented)
   mobile/              # Expo client (planned)
 workers/
   laptop/              # Outbound connected worker (planned)
@@ -70,7 +70,7 @@ docs/
 - The policy allows read/draft work and reversible workspace writes without creating an approval request. Higher-impact categories are gated.
 - The API, agent adapters and model-provider selection are source-controlled. LangGraph's Postgres checkpoint integration, owner-scoped run history and resume endpoints are implemented in source. Configure LANGGRAPH_POSTGRES_URI before durable checkpoints become active.
 
-**Not yet live:** the API and agent runtimes are not deployed or configured with server-only Supabase credentials; no Charvi web/mobile interface, Hermes/OpenClaw/OpenHands services, Browser Use worker, laptop pairing, voice interface, notifications, backup automation or restore service is deployed. Durable checkpoint code is committed, but the API still needs LANGGRAPH_POSTGRES_URI and a running deployment. Ollama itself still needs to be installed and configured on the user's machine.
+**Not yet live:** the API and Next.js owner console are not deployed or configured with Supabase credentials; no Hermes/OpenClaw/OpenHands services, Browser Use worker, laptop pairing, voice interface, notifications, backup automation or restore service is deployed. Durable checkpoint code is committed, but the API still needs LANGGRAPH_POSTGRES_URI and a running deployment. Ollama itself still needs to be installed and configured on the user's machine.
 
 ## Local development
 
