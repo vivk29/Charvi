@@ -519,13 +519,16 @@ async def resume_agent_run(
     )
     try:
         result = await orchestrator.resume(thread_id=internal_thread_id)
+        if result is None:
+            # If the process stopped before the first checkpoint, restart only this
+            # non-approval-bound task from its persisted input.
+            result = await orchestrator.run(
+                task=run_input.get("task", record.get("objective", "")),
+                context=run_input.get("context", ""),
+                thread_id=internal_thread_id,
+            )
     except RuntimeError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
-    if result is None:
-        raise HTTPException(
-            status_code=409,
-            detail="No pending LangGraph checkpoint exists for this run. Start a new run instead.",
-        )
     response = format_orchestration_result(result)
     response.update({
         "run_id": str(run_id),
