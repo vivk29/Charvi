@@ -94,3 +94,16 @@ def test_langgraph_graph_compiles_when_optional_dependency_is_installed() -> Non
     pytest.importorskip("langgraph.graph")
     orchestrator = CharviOrchestrator(AgentSettings())
     assert orchestrator._graph is not None
+
+
+
+def test_openclaw_device_control_requires_explicit_approval() -> None:
+    registry = build_agent_registry(AgentSettings(
+        openclaw_base_url="http://openclaw:18789/v1",
+        openclaw_api_token="token",
+    ))
+    assert route_specialists("Turn on my smart home lights", registry) == []
+    assert route_specialists(
+        "Turn on my smart home lights", registry, allow_device_control=True
+    ) == ["openclaw"]
+    assert registry["openclaw"].execution_capable is True
