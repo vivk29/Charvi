@@ -2,7 +2,6 @@ from fastapi.testclient import TestClient
 
 from charvi_api.main import app
 
-
 client = TestClient(app)
 
 
