@@ -1,4 +1,8 @@
-from charvi_api.memory import build_memory_context, is_safe_memory_content
+from charvi_api.memory import (
+    build_memory_context,
+    is_safe_memory_content,
+    normalize_memory_query,
+)
 
 
 def test_memory_content_rejects_obvious_inline_credentials() -> None:
@@ -21,3 +25,10 @@ def test_memory_context_is_bounded_to_five_items() -> None:
         {"title": str(index), "content": "Saved fact"} for index in range(8)
     ])
     assert context.count("- ") == 5
+
+def test_memory_search_query_strips_search_operators_and_limits_terms() -> None:
+    assert normalize_memory_query('GST "reconciliation" OR token=secret') == (
+        "GST reconciliation OR token secret"
+    )
+    assert len(normalize_memory_query("word " * 40).split()) == 20
+    assert normalize_memory_query("!!!") == ""
