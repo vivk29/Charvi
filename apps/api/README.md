@@ -103,3 +103,18 @@ Checkpointing is short-term, thread-scoped workflow memory. Long-term memories l
 Specialist runtimes are untrusted workers. They receive only task/context explicitly passed to them. They do not receive Supabase service credentials, owner tokens, or direct access to Charvi's permission database. External content is untrusted data, not instructions. OpenHands execution is approval-gated; Browser Use is intended for read-only browsing; device, financial, messaging, deployment and destructive actions remain behind Charvi's own policy and approval gateway.
 
 A configured adapter is not the same as a live agent. Services must be deployed, reachable over private authenticated networking, and configured with credentials before they can run. LangGraph is installed in the API image; Browser Use runs separately; OpenHands requires its Agent Server and an isolated workspace runtime.
+
+## Feminine speech output (optional Kokoro worker)
+
+Charvi can use the optional Kokoro-82M voice service for speech output. The API proxies requests through the authenticated `POST /v1/voice/speak` endpoint; the browser never calls the worker directly and the worker port is not published to the host.
+
+To enable locally:
+
+1. Set `KOKORO_TTS_URL=http://voice-worker:7860` in the private API `.env`.
+2. Start the worker with `docker compose --profile voice up -d`.
+3. Restart the API.
+4. In the dashboard, choose a feminine voice (default: `af_heart`) and press **Read response aloud**.
+
+The worker uses the pinned `hangrylabs/kokorotts:v0.2` image. It is optional and has a 2 GB memory limit / 2 CPU limit; CPU synthesis may be slower. The voice API supports the Kokoro English and Hindi voice IDs currently exposed in the dashboard. Kannada is not in Kokoro's documented voice catalogue, so Kannada speech falls back to a voice installed on the user's device. If the worker is not configured, the dashboard also falls back to browser/device speech synthesis.
+
+Never expose port 7860 publicly. The worker has no direct access to Supabase credentials, the laptop filesystem or the browser session.
