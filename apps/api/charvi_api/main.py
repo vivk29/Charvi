@@ -252,7 +252,7 @@ async def run_agent_task(
         if approval is None or approval.get("workspace_id") != str(payload.workspace_id):
             raise HTTPException(status_code=404, detail="Approval request not found.")
         if approval.get("status") != "approved":
-            raise HTTPException(status_code=409, detail="OpenHands requires an approved execution request.")
+            raise HTTPException(status_code=409, detail="This agent runtime requires an approved execution request.")
         expiry = approval.get("expires_at")
         if expiry and datetime.fromisoformat(expiry) <= datetime.now(UTC):
             raise HTTPException(status_code=409, detail="Execution approval has expired.")
