@@ -1,3 +1,7 @@
+import asyncio
+
+import pytest
+
 from charvi_api.agents import (
     AgentSettings,
     BrowserUseSDKBackend,
@@ -54,9 +58,11 @@ def test_router_prefers_browser_use_for_read_only_browser_research() -> None:
 def test_browser_use_blocks_state_changing_tasks() -> None:
     backend = BrowserUseSDKBackend(AgentSettings(
         browser_use_enabled=True,
-        browser_use_api_key="private",
+        browser_use_worker_token="private",
     ))
     assert backend._blocked.search("Book an appointment")
+    result = asyncio.run(backend.invoke(task="Research a public webpage", context=""))
+    assert result.status == "not_configured"
 
 
 def test_router_uses_hermes_for_general_research() -> None:
@@ -82,3 +88,9 @@ def test_catalog_reports_langgraph_and_does_not_expose_credentials() -> None:
     rendered = str(catalog)
     assert "secret" not in rendered
     assert "private-token" not in rendered
+
+
+def test_langgraph_graph_compiles_when_optional_dependency_is_installed() -> None:
+    pytest.importorskip("langgraph.graph")
+    orchestrator = CharviOrchestrator(AgentSettings())
+    assert orchestrator._graph is not None
