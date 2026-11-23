@@ -154,79 +154,6 @@ export function Dashboard({ initialEmail }: { initialEmail: string | null }) {
   }, []);
 
   useEffect(() => {
-    function toggleVoiceInput() {
-    if (recognitionRef.current) {
-      recognitionRef.current.stop();
-      setIsListening(false);
-      setVoiceStatus("Voice capture stopped.");
-      return;
-    }
-
-    const SpeechRecognitionApi =
-      window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognitionApi) {
-      setVoiceStatus("Voice dictation is not supported in this browser. You can still type your task.");
-      return;
-    }
-
-    const recognition = new SpeechRecognitionApi();
-    recognition.lang = voiceLanguage;
-    recognition.continuous = false;
-    recognition.interimResults = true;
-    recognition.maxAlternatives = 1;
-    recognition.onresult = (event) => {
-      let finalTranscript = "";
-      let interimTranscript = "";
-      for (let index = event.resultIndex; index < event.results.length; index += 1) {
-        const transcript = event.results[index][0]?.transcript || "";
-        if (event.results[index].isFinal) finalTranscript += transcript;
-        else interimTranscript += transcript;
-      }
-      if (finalTranscript.trim()) {
-        setTask((current) =>
-          current.trim()
-            ? `${current.trim()} ${finalTranscript.trim()}`
-            : finalTranscript.trim(),
-        );
-      }
-      setVoiceStatus(
-        interimTranscript
-          ? `Listening: ${interimTranscript}`
-          : finalTranscript
-            ? "Speech added to your task."
-            : "Listening…",
-      );
-    };
-    recognition.onerror = (event) => {
-      setVoiceStatus(`Voice input error: ${event.error}`);
-      setIsListening(false);
-      recognitionRef.current = null;
-    };
-    recognition.onend = () => {
-      setIsListening(false);
-      recognitionRef.current = null;
-    };
-
-    recognitionRef.current = recognition;
-    setIsListening(true);
-    setVoiceStatus("Listening…");
-    recognition.start();
-  }
-
-  function speakLastResponse() {
-    const text = lastResult?.coordinator?.output;
-    if (!text) return;
-    if (!("speechSynthesis" in window)) {
-      setVoiceStatus("Speech playback is not supported in this browser.");
-      return;
-    }
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text.slice(0, 4000));
-    utterance.lang = voiceLanguage;
-    window.speechSynthesis.speak(utterance);
-    setVoiceStatus("Reading Charvi's latest response.");
-  }
-
   if (!supabase) {
       setAuthLoading(false);
       return;
@@ -463,6 +390,80 @@ export function Dashboard({ initialEmail }: { initialEmail: string | null }) {
       setError(reason instanceof Error ? reason.message : "Thread history could not be loaded.");
     }
   }
+
+  function toggleVoiceInput() {
+  if (recognitionRef.current) {
+    recognitionRef.current.stop();
+    setIsListening(false);
+    setVoiceStatus("Voice capture stopped.");
+    return;
+  }
+
+  const SpeechRecognitionApi =
+    window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognitionApi) {
+    setVoiceStatus("Voice dictation is not supported in this browser. You can still type your task.");
+    return;
+  }
+
+  const recognition = new SpeechRecognitionApi();
+  recognition.lang = voiceLanguage;
+  recognition.continuous = false;
+  recognition.interimResults = true;
+  recognition.maxAlternatives = 1;
+  recognition.onresult = (event) => {
+    let finalTranscript = "";
+    let interimTranscript = "";
+    for (let index = event.resultIndex; index < event.results.length; index += 1) {
+      const transcript = event.results[index][0]?.transcript || "";
+      if (event.results[index].isFinal) finalTranscript += transcript;
+      else interimTranscript += transcript;
+    }
+    if (finalTranscript.trim()) {
+      setTask((current) =>
+        current.trim()
+          ? `${current.trim()} ${finalTranscript.trim()}`
+          : finalTranscript.trim(),
+      );
+    }
+    setVoiceStatus(
+      interimTranscript
+        ? `Listening: ${interimTranscript}`
+        : finalTranscript
+          ? "Speech added to your task."
+          : "Listening…",
+    );
+  };
+  recognition.onerror = (event) => {
+    setVoiceStatus(`Voice input error: ${event.error}`);
+    setIsListening(false);
+    recognitionRef.current = null;
+  };
+  recognition.onend = () => {
+    setIsListening(false);
+    recognitionRef.current = null;
+  };
+
+  recognitionRef.current = recognition;
+  setIsListening(true);
+  setVoiceStatus("Listening…");
+  recognition.start();
+  }
+
+  function speakLastResponse() {
+  const text = lastResult?.coordinator?.output;
+  if (!text) return;
+  if (!("speechSynthesis" in window)) {
+    setVoiceStatus("Speech playback is not supported in this browser.");
+    return;
+  }
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(text.slice(0, 4000));
+  utterance.lang = voiceLanguage;
+  window.speechSynthesis.speak(utterance);
+  setVoiceStatus("Reading Charvi's latest response.");
+  }
+
 
   if (!supabase) {
     return (
