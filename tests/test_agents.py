@@ -72,29 +72,46 @@ def test_router_uses_hermes_for_general_research() -> None:
     assert route_specialists("Research the latest GST changes", registry) == ["hermes"]
 
 
-def test_catalog_reports_langgraph_and_does_not_expose_credentials() -> None:
+def test_catalog_defaults_to_ollama_without_any_paid_provider() -> None:
+    orchestrator = CharviOrchestrator(AgentSettings())
+    catalog = orchestrator.catalog()
+    coordinator = next(item for item in catalog if item["kind"] == "coordinator_model")
+    assert coordinator["id"] == "ollama"
+    assert coordinator["provider"] == "ollama"
+    assert coordinator["configured"] is False
+
+
+def test_catalog_can_select_openai_only_when_explicitly_requested() -> None:
     orchestrator = CharviOrchestrator(AgentSettings(
+        coordinator_provider="openai",
         openai_api_key="secret",
         openai_model="model",
         hermes_base_url="http://hermes:8642/v1",
         hermes_api_token="private-token",
     ))
     catalog = orchestrator.catalog()
-    openai = next(item for item in catalog if item["id"] == "openai")
+    coordinator = next(item for item in catalog if item["kind"] == "coordinator_model")
     langgraph = next(item for item in catalog if item["id"] == "langgraph")
-    assert openai["kind"] == "coordinator_model"
-    assert openai["configured"] is True
+    assert coordinator["id"] == "openai"
+    assert coordinator["configured"] is True
     assert langgraph["kind"] == "orchestration_framework"
     rendered = str(catalog)
     assert "secret" not in rendered
     assert "private-token" not in rendered
 
 
+def test_ollama_provider_requires_local_url_and_model() -> None:
+    from charvi_api.providers import OllamaCoordinatorBackend
+
+    backend = OllamaCoordinatorBackend(AgentSettings())
+    result = asyncio.run(backend.invoke(task="Hello Charvi", context=""))
+    assert result.status == "not_configured"
+
+
 def test_langgraph_graph_compiles_when_optional_dependency_is_installed() -> None:
     pytest.importorskip("langgraph.graph")
     orchestrator = CharviOrchestrator(AgentSettings())
     assert orchestrator._graph is not None
-
 
 
 def test_openclaw_device_control_requires_explicit_approval() -> None:
