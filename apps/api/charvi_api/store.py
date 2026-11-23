@@ -1,0 +1,162 @@
+"""Server-only Supabase Data API access for the Charvi control plane."""
+from __future__ import annotations
+
+from typing import Any
+from urllib.parse import quote
+
+import httpx
+from fastapi import HTTPException
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class StoreSettings(BaseSettings):
+    supabase_url: str = ""
+    supabase_service_role_key: str = ""
+
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+
+class SupabaseRestStore:
+    """Minimal privileged store. The service-role credential never leaves the API."""
+
+    def __init__(self, settings: StoreSettings | None = None) -> None:
+        self.settings = settings or StoreSettings()
+
+    def _headers(self, *, prefer: str | None = None) -> dict[str, str]:
+        if not self.settings.supabase_url or not self.settings.supabase_service_role_key:
+            raise HTTPException(
+                status_code=503,
+                detail="Charvi's private database connection is not configured.",
+            )
+        headers = {
+            "apikey": self.settings.supabase_service_role_key,
+            "Authorization": f"Bearer {self.settings.supabase_service_role_key}",
+            "Content-Type": "application/json",
+        }
+        if prefer:
+            headers["Prefer"] = prefer
+        return headers
+
+    async def _request(
+        self,
+        method: str,
+        table: str,
+        *,
+        params: dict[str, str] | None = None,
+        body: dict[str, Any] | None = None,
+        prefer: str | None = None,
+    ) -> list[dict[str, Any]]:
+        url = f"{self.settings.supabase_url.rstrip('/')}/rest/v1/{quote(table)}"
+        try:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(8.0)) as client:
+                response = await client.request(
+                    method,
+                    url,
+                    params=params,
+                    json=body,
+                    headers=self._headers(prefer=prefer),
+                )
+        except httpx.HTTPError as exc:
+            raise HTTPException(status_code=503, detail="Charvi's database is unavailable.") from exc
+
+        if response.status_code in (401, 403):
+            raise HTTPException(status_code=503, detail="Charvi's private database credential was rejected.")
+        if response.status_code >= 500:
+            raise HTTPException(status_code=503, detail="Charvi's database is temporarily unavailable.")
+        if response.status_code >= 400:
+            raise HTTPException(status_code=502, detail="The database rejected the requested operation.")
+        if not response.content:
+            return []
+        try:
+            data = response.json()
+        except ValueError as exc:
+            raise HTTPException(status_code=502, detail="The database returned an invalid response.") from exc
+        return data if isinstance(data, list) else []
+
+    async def list_workspaces(self, owner_id: str) -> list[dict[str, Any]]:
+        return await self._request(
+            "GET", "workspaces",
+            params={
+                "select": "id,name,slug,created_at,updated_at",
+                "owner_id": f"eq.{owner_id}",
+                "order": "created_at.asc",
+            },
+        )
+
+    async def get_workspace(self, workspace_id: str, owner_id: str) -> dict[str, Any] | None:
+        rows = await self._request(
+            "GET", "workspaces",
+            params={
+                "select": "id,name,slug,owner_id",
+                "id": f"eq.{workspace_id}",
+                "owner_id": f"eq.{owner_id}",
+                "limit": "1",
+            },
+        )
+        return rows[0] if rows else None
+
+    async def create_approval(self, record: dict[str, Any]) -> dict[str, Any]:
+        rows = await self._request(
+            "POST", "approvals",
+            params={"select": "*"},
+            body=record,
+            prefer="return=representation",
+        )
+        if not rows:
+            raise HTTPException(status_code=502, detail="The approval request was not persisted.")
+        return rows[0]
+
+    async def list_approvals(self, workspace_id: str) -> list[dict[str, Any]]:
+        return await self._request(
+            "GET", "approvals",
+            params={
+                "select": "id,workspace_id,action_type,action_category,title,description,payload,status,risk_level,expires_at,created_at,decided_by,decided_at,decision_note,payload_sha256,approval_nonce",
+                "workspace_id": f"eq.{workspace_id}",
+                "order": "created_at.desc",
+                "limit": "100",
+            },
+        )
+
+    async def get_approval(self, approval_id: str) -> dict[str, Any] | None:
+        rows = await self._request(
+            "GET", "approvals",
+            params={"select": "*", "id": f"eq.{approval_id}", "limit": "1"},
+        )
+        return rows[0] if rows else None
+
+    async def decide_approval(
+        self,
+        approval_id: str,
+        *,
+        actor_id: str,
+        status: str,
+        note: str | None,
+        decided_at: str,
+    ) -> dict[str, Any] | None:
+        rows = await self._request(
+            "PATCH", "approvals",
+            params={"id": f"eq.{approval_id}", "status": "eq.pending", "select": "*"},
+            body={
+                "status": status,
+                "decided_by": actor_id,
+                "decided_at": decided_at if status != "cancelled" else None,
+                "decision_note": note,
+            },
+            prefer="return=representation",
+        )
+        return rows[0] if rows else None
+
+    async def list_approval_events(self, approval_id: str) -> list[dict[str, Any]]:
+        return await self._request(
+            "GET", "approval_decision_events",
+            params={
+                "select": "id,approval_id,event_type,actor_id,payload_sha256,metadata,created_at",
+                "approval_id": f"eq.{approval_id}",
+                "order": "created_at.asc",
+                "limit": "100",
+            },
+        )
+
+
+def get_store() -> SupabaseRestStore:
+    return SupabaseRestStore()
