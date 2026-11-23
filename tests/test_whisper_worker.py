@@ -1,3 +1,4 @@
+# ruff: noqa: I001
 import importlib.util
 import sys
 from pathlib import Path
@@ -29,6 +30,6 @@ def test_whisper_worker_fails_closed_without_configured_token(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.delenv("CHARVI_WHISPER_WORKER_TOKEN", raising=False)
-    with pytest.raises(HTTPException) as error:
+    with pytest.raises(WORKER.HTTPException) as error:
         WORKER.authorize_worker("anything")
     assert error.value.status_code == 503
