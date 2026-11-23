@@ -28,6 +28,7 @@ class ActionEvaluationInput(BaseModel):
     description: str = Field(min_length=1, max_length=2000)
     reversible: bool = True
     idempotency_key: str = Field(min_length=1, max_length=128)
+    payload: dict[str, object] = Field(default_factory=dict)
 
 
 class ApprovalRequestInput(BaseModel):
@@ -100,6 +101,7 @@ async def evaluate_action_request(
             reversible=payload.reversible,
         ),
         idempotency_key=payload.idempotency_key,
+        payload=payload.payload,
     )
     decision = authorize_gateway_request(request, now_epoch=int(time.time()))
     return {
@@ -132,6 +134,7 @@ async def create_approval_request(
         actor_id=user.user_id,
         action=action,
         idempotency_key=payload.idempotency_key,
+        payload=payload.payload,
     )
     expires_at = datetime.now(UTC) + timedelta(minutes=payload.expires_in_minutes)
     record = await store.create_approval({
