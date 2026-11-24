@@ -741,6 +741,22 @@ async def extract_knowledge_file(
         raise
 
 
+@app.get("/v1/workspaces/{workspace_id}/knowledge-search", tags=["knowledge"])
+async def search_knowledge(
+    workspace_id: UUID,
+    user: CurrentUser,
+    store: Store,
+    q: Annotated[str, Query(min_length=2, max_length=200)],
+    limit: Annotated[int, Query(ge=1, le=50)] = 20,
+) -> list[dict[str, object]]:
+    """Search extracted chunks within the authenticated owner's workspace only."""
+    await owned_workspace(store, workspace_id, user)
+    query = " ".join(q.split())
+    if len(query) < 2:
+        raise HTTPException(status_code=422, detail="Enter at least two non-space characters.")
+    return await store.search_knowledge_chunks(str(workspace_id), query, limit=limit)
+
+
 @app.get("/v1/workspaces/{workspace_id}/knowledge-files/{file_id}/chunks", tags=["knowledge"])
 async def list_knowledge_file_chunks(
     workspace_id: UUID, file_id: UUID, user: CurrentUser, store: Store,
