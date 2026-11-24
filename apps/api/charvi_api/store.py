@@ -404,6 +404,20 @@ class SupabaseRestStore:
                             params={"id": f"eq.{file_id}", "workspace_id": f"eq.{workspace_id}"},
                             body=changes, prefer="return=minimal")
 
+    async def search_knowledge_chunks(
+        self, workspace_id: str, query: str, *, limit: int = 20
+    ) -> list[dict[str, Any]]:
+        return await self._request(
+            "GET", "knowledge_chunks",
+            params={
+                "select": "id,knowledge_file_id,chunk_index,content,locator_type,locator,content_sha256",
+                "workspace_id": f"eq.{workspace_id}",
+                "content": f"fts.{query}",
+                "order": "chunk_index.asc",
+                "limit": str(max(1, min(limit, 50))),
+            },
+        )
+
     async def list_knowledge_chunks(
         self, file_id: str, workspace_id: str, *, limit: int = 100
     ) -> list[dict[str, Any]]:
