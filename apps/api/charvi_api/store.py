@@ -412,7 +412,7 @@ class SupabaseRestStore:
             params={
                 "select": "id,knowledge_file_id,chunk_index,content,locator_type,locator,content_sha256",
                 "workspace_id": f"eq.{workspace_id}",
-                "search_vector": f"fts.{query}",
+                "search_vector": f"plfts.{query}",
                 "order": "chunk_index.asc",
                 "limit": str(max(1, min(limit, 50))),
             },
