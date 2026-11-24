@@ -1,4 +1,5 @@
 """File type validation helpers for Charvi's private knowledge vault."""
+
 import dataclasses
 import io
 import zipfile
