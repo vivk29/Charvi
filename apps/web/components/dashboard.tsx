@@ -281,9 +281,24 @@ export function Dashboard({ initialEmail }: { initialEmail: string | null }) {
     if (!supabase) return;
     setAuthBusy(true);
     setAuthError("");
-    const { error: signUpError } = await supabase.auth.signUp({ email, password });
-    setAuthError(signUpError ? signUpError.message : "Check your email to confirm your account.");
-    setAuthBusy(false);
+    try {
+      const { error: signUpError } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback?next=/`,
+        },
+      });
+      setAuthError(
+        signUpError
+          ? signUpError.message
+          : "Account created. Check your email to confirm it, then sign in here.",
+      );
+    } catch (reason) {
+      setAuthError(reason instanceof Error ? reason.message : "Account creation failed.");
+    } finally {
+      setAuthBusy(false);
+    }
   }
 
   async function signOut() {
