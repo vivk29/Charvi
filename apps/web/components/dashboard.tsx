@@ -38,7 +38,8 @@ type Run = {
   error_summary?: string;
   created_at: string;
 };
-type KnowledgeFile = { id: string; original_name: string; mime_type: string; size_bytes: number; department?: string | null; status: string; created_at: string };
+type KnowledgeFile = { id: string; original_name: string; mime_type: string; size_bytes: number; department?: string | null; status: string; extraction_summary?: string | null; created_at: string };
+type KnowledgeChunk = { id: string; chunk_index: number; content: string; locator_type: string; locator: Record<string, unknown> };
 type Approval = {
   id: string;
   title: string;
@@ -123,6 +124,9 @@ export function Dashboard({ initialEmail }: { initialEmail: string | null }) {
   const [knowledgeFiles, setKnowledgeFiles] = useState<KnowledgeFile[]>([]);
   const [uploadBusy, setUploadBusy] = useState(false);
   const [uploadDepartment, setUploadDepartment] = useState("");
+  const [extractingFileId, setExtractingFileId] = useState("");
+  const [selectedKnowledgeFile, setSelectedKnowledgeFile] = useState("");
+  const [knowledgeChunks, setKnowledgeChunks] = useState<KnowledgeChunk[]>([]);
   const [dataBusy, setDataBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -363,6 +367,44 @@ export function Dashboard({ initialEmail }: { initialEmail: string | null }) {
     }
   }
 
+
+
+  async function extractKnowledgeFile(fileId: string) {
+    if (!token || !workspaceId) return;
+    setExtractingFileId(fileId);
+    setError("");
+    setNotice("");
+    try {
+      const result = await apiRequest<{ summary: string }>(
+        \`/v1/workspaces/\${workspaceId}/knowledge-files/\${fileId}/extract\`, token, { method: "POST" },
+      );
+      setNotice(result.summary);
+      setSelectedKnowledgeFile(fileId);
+      const chunks = await apiRequest<KnowledgeChunk[]>(
+        \`/v1/workspaces/\${workspaceId}/knowledge-files/\${fileId}/chunks\`, token,
+      );
+      setKnowledgeChunks(chunks);
+      await refreshWorkspaceData(token, workspaceId);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Document extraction failed.");
+      await refreshWorkspaceData(token, workspaceId);
+    } finally {
+      setExtractingFileId("");
+    }
+  }
+
+  async function viewKnowledgeChunks(fileId: string) {
+    if (!token || !workspaceId) return;
+    setSelectedKnowledgeFile(fileId);
+    try {
+      const chunks = await apiRequest<KnowledgeChunk[]>(
+        \`/v1/workspaces/\${workspaceId}/knowledge-files/\${fileId}/chunks\`, token,
+      );
+      setKnowledgeChunks(chunks);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not load extracted text.");
+    }
+  }
 
   async function uploadKnowledgeFiles(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -844,8 +886,22 @@ export function Dashboard({ initialEmail }: { initialEmail: string | null }) {
                 {knowledgeFiles.map((file) => <article className="run-card" key={file.id}>
                   <div className="card-top"><strong>{file.original_name}</strong><span className={statusClass(file.status === "ready" ? "completed" : file.status === "failed" ? "failed" : null)}>{file.status}</span></div>
                   <small className="muted">{file.department || "Unassigned"} · {(file.size_bytes / 1024 / 1024).toFixed(2)} MB · {formatDate(file.created_at)}</small>
-                  <small className="muted">Stored privately · extraction not yet enabled</small>
+                  <small className="muted">{file.extraction_summary || "Original stored privately; extract to make its contents searchable."}</small>
+                  <div className="form-row">
+                    <button className="quiet" type="button" onClick={() => void viewKnowledgeChunks(file.id)}>View extracted text</button>
+                    <button className="primary" type="button" disabled={extractingFileId === file.id || file.status === "processing"} onClick={() => void extractKnowledgeFile(file.id)}>
+                      {extractingFileId === file.id ? "Extracting…" : file.status === "ready" ? "Re-extract" : "Extract document"}
+                    </button>
+                  </div>
                 </article>)}
+                {selectedKnowledgeFile && <article className="panel stack">
+                  <div className="card-top"><strong>Extracted source text</strong><button className="text-button" type="button" onClick={() => { setSelectedKnowledgeFile(""); setKnowledgeChunks([]); }}>Close</button></div>
+                  {knowledgeChunks.map((chunk) => <div className="history-message" key={chunk.id}>
+                    <small className="muted">Chunk {chunk.chunk_index + 1} · {chunk.locator_type} · {JSON.stringify(chunk.locator)}</small>
+                    <p>{chunk.content}</p>
+                  </div>)}
+                  {knowledgeChunks.length === 0 && <p className="muted">No extracted chunks are available yet.</p>}
+                </article>}
                 {knowledgeFiles.length === 0 && <p className="muted">No files uploaded to this workspace yet.</p>}
               </div>
             </section>
