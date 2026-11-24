@@ -25,7 +25,7 @@ def test_csv_must_be_utf8_text_without_nul_bytes():
 
 
 def test_png_signature_is_required():
-    result = validate_file("scan.png", b"\x89PNG\\r\n\x1a\n" + b"data")
+    result = validate_file("scan.png", b"\x89PNG\r\n\x1a\n" + b"data")
     assert result.mime_type == "image/png"
 
 
