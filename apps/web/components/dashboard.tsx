@@ -704,6 +704,7 @@ export function Dashboard({ initialEmail }: { initialEmail: string | null }) {
             <label>Password<input type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} /></label>
             {authError && <p className="error">{authError}</p>}
             <button className="primary" disabled={authBusy}>{authBusy ? "Please wait…" : "Sign in"}</button>
+            <button className="text-button" type="button" disabled={authBusy} onClick={() => { window.location.href = "/reset-password"; }}>Forgot password?</button>
             <button className="quiet" type="button" disabled={authBusy} onClick={signUp}>Create account</button>
           </form>
         </section>
