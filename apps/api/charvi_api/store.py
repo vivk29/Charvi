@@ -362,5 +362,58 @@ class SupabaseRestStore:
         )
 
 
+    async def get_knowledge_file(self, file_id: str, workspace_id: str) -> dict[str, Any] | None:
+        rows = await self._request(
+            "GET", "knowledge_files",
+            params={"select": "id,workspace_id,owner_id,original_name,extension,storage_path,status",
+                    "id": f"eq.{file_id}", "workspace_id": f"eq.{workspace_id}", "limit": "1"},
+        )
+        return rows[0] if rows else None
+
+    async def download_knowledge_object(self, path: str) -> bytes:
+        if not self.settings.supabase_url or not self.settings.supabase_service_role_key:
+            raise HTTPException(status_code=503, detail="Charvi's private storage is not configured.")
+        url = f"{self.settings.supabase_url.rstrip('/')}/storage/v1/object/charvi-knowledge/{quote(path, safe='/')}"
+        headers = {"apikey": self.settings.supabase_service_role_key,
+                   "Authorization": f"Bearer {self.settings.supabase_service_role_key}"}
+        try:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(60.0)) as client:
+                response = await client.get(url, headers=headers)
+        except httpx.HTTPError as exc:
+            raise HTTPException(status_code=503, detail="Private file storage is unavailable.") from exc
+        if response.status_code == 404:
+            raise HTTPException(status_code=404, detail="The stored original file is missing.")
+        if response.status_code >= 400:
+            raise HTTPException(status_code=502, detail="Private file storage could not return the original.")
+        return response.content
+
+    async def replace_knowledge_chunks(
+        self, file_id: str, workspace_id: str, chunks: list[dict[str, Any]]
+    ) -> None:
+        await self._request("DELETE", "knowledge_chunks",
+                            params={"knowledge_file_id": f"eq.{file_id}", "workspace_id": f"eq.{workspace_id}"})
+        if chunks:
+            records = [{"knowledge_file_id": file_id, "workspace_id": workspace_id,
+                        "chunk_index": index, **chunk} for index, chunk in enumerate(chunks)]
+            await self._request("POST", "knowledge_chunks", body=records, prefer="return=minimal")
+
+    async def update_knowledge_file(
+        self, file_id: str, workspace_id: str, changes: dict[str, Any]
+    ) -> None:
+        await self._request("PATCH", "knowledge_files",
+                            params={"id": f"eq.{file_id}", "workspace_id": f"eq.{workspace_id}"},
+                            body=changes, prefer="return=minimal")
+
+    async def list_knowledge_chunks(
+        self, file_id: str, workspace_id: str, *, limit: int = 100
+    ) -> list[dict[str, Any]]:
+        return await self._request(
+            "GET", "knowledge_chunks",
+            params={"select": "id,chunk_index,content,locator_type,locator,content_sha256",
+                    "knowledge_file_id": f"eq.{file_id}", "workspace_id": f"eq.{workspace_id}",
+                    "order": "chunk_index.asc", "limit": str(max(1, min(limit, 200)))},
+        )
+
+
 def get_store() -> SupabaseRestStore:
     return SupabaseRestStore()
