@@ -841,7 +841,7 @@ async def run_agent_task(
                     f"{item.get('locator_type')}: {locator}] "
                     f"{str(item.get('content') or '')[:1800]}"
                 )
-            run_context = "\\n\\n".join(part for part in (run_context, "\\n".join(excerpts)) if part)
+            run_context = "\n\n".join(part for part in (run_context, "\n".join(excerpts)) if part)
 
     external_thread_id = str(payload.thread_id or uuid4())
     internal_thread_id = checkpoint_thread_key(
