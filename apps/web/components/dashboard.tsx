@@ -376,12 +376,12 @@ export function Dashboard({ initialEmail }: { initialEmail: string | null }) {
     setNotice("");
     try {
       const result = await apiRequest<{ summary: string }>(
-        \`/v1/workspaces/\${workspaceId}/knowledge-files/\${fileId}/extract\`, token, { method: "POST" },
+        `/v1/workspaces/${workspaceId}/knowledge-files/${fileId}/extract`, token, { method: "POST" },
       );
       setNotice(result.summary);
       setSelectedKnowledgeFile(fileId);
       const chunks = await apiRequest<KnowledgeChunk[]>(
-        \`/v1/workspaces/\${workspaceId}/knowledge-files/\${fileId}/chunks\`, token,
+        `/v1/workspaces/${workspaceId}/knowledge-files/${fileId}/chunks`, token,
       );
       setKnowledgeChunks(chunks);
       await refreshWorkspaceData(token, workspaceId);
@@ -398,7 +398,7 @@ export function Dashboard({ initialEmail }: { initialEmail: string | null }) {
     setSelectedKnowledgeFile(fileId);
     try {
       const chunks = await apiRequest<KnowledgeChunk[]>(
-        \`/v1/workspaces/\${workspaceId}/knowledge-files/\${fileId}/chunks\`, token,
+        `/v1/workspaces/${workspaceId}/knowledge-files/${fileId}/chunks`, token,
       );
       setKnowledgeChunks(chunks);
     } catch (reason) {
