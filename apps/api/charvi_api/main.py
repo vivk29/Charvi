@@ -26,6 +26,7 @@ from pydantic import BaseModel, Field
 from .agents import AgentSettings
 from .auth import UserIdentity, get_current_user
 from .gateway import GatewayRequest, authorize_gateway_request, payload_digest
+from .knowledge import MAX_FILE_BYTES, validate_file
 from .memory import (
     build_memory_context,
     is_safe_memory_content,
@@ -322,6 +323,73 @@ async def health() -> dict[str, str]:
 @app.get("/v1/me", tags=["identity"])
 async def current_identity(user: CurrentUser) -> dict[str, str | None]:
     return {"user_id": user.user_id, "email": user.email}
+
+
+
+@app.post("/v1/workspaces/{workspace_id}/knowledge-files", tags=["knowledge"], status_code=201)
+async def upload_knowledge_file(
+    workspace_id: UUID,
+    file: Annotated[UploadFile, File()],
+    user: CurrentUser,
+    store: Store,
+    department: Annotated[str | None, Form()] = None,
+) -> dict[str, object]:
+    """Upload one validated file to the private, workspace-scoped knowledge vault."""
+    await owned_workspace(store, workspace_id, user)
+    content = await file.read(MAX_FILE_BYTES + 1)
+    await file.close()
+    try:
+        validated = validate_file(file.filename or "", content)
+    except ValueError as exc:
+        message = str(exc)
+        status_code = 413 if "15 MB" in message else 415
+        raise HTTPException(status_code=status_code, detail=message) from exc
+
+    allowed_departments = {
+        "Finance & Treasury", "Accounting & Tax", "Sales & Revenue", "Marketing",
+        "Human Resources", "Operations & Supply Chain", "Customer Support",
+        "Legal & Compliance", "Projects & IT", "Procurement & Vendors",
+        "Strategy & Executive Office",
+    }
+    selected_department = department.strip() if department else None
+    if selected_department and selected_department not in allowed_departments:
+        raise HTTPException(status_code=422, detail="Unknown department. Create a custom department first.")
+
+    file_id = uuid4()
+    safe_extension = validated.extension
+    storage_path = f"{workspace_id}/{user.user_id}/{file_id}.{safe_extension}"
+    digest = hashlib.sha256(content).hexdigest()
+    await store.upload_knowledge_object(storage_path, content, validated.mime_type)
+    try:
+        record = await store.create_knowledge_file({
+            "id": str(file_id),
+            "workspace_id": str(workspace_id),
+            "owner_id": user.user_id,
+            "original_name": (file.filename or "upload").replace("\\x00", "")[:255],
+            "mime_type": validated.mime_type,
+            "extension": safe_extension,
+            "size_bytes": len(content),
+            "sha256": digest,
+            "storage_bucket": "charvi-knowledge",
+            "storage_path": storage_path,
+            "department": selected_department,
+            "status": "uploaded",
+            "metadata": {"source": "owner_upload", "content_type_header_ignored": True},
+        })
+    except Exception:
+        await store.delete_knowledge_object(storage_path)
+        raise
+    return record
+
+
+@app.get("/v1/workspaces/{workspace_id}/knowledge-files", tags=["knowledge"])
+async def list_knowledge_files(
+    workspace_id: UUID,
+    user: CurrentUser,
+    store: Store,
+) -> list[dict[str, object]]:
+    await owned_workspace(store, workspace_id, user)
+    return await store.list_knowledge_files(str(workspace_id))
 
 
 @app.post("/v1/workspaces", tags=["workspaces"], status_code=201)
