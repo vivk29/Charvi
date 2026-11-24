@@ -1,9 +1,9 @@
 """File type validation helpers for Charvi's private knowledge vault."""
 from __future__ import annotations
 
-from dataclasses import dataclass
 import io
 import zipfile
+from dataclasses import dataclass
 
 
 MAX_FILE_BYTES = 15 * 1024 * 1024
