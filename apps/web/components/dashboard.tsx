@@ -109,8 +109,11 @@ export function Dashboard({ initialEmail }: { initialEmail: string | null }) {
   const [authLoading, setAuthLoading] = useState(true);
   const [email, setEmail] = useState(initialEmail || "");
   const [password, setPassword] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [authMode, setAuthMode] = useState<"signin" | "signup">("signin");
   const [authBusy, setAuthBusy] = useState(false);
   const [authError, setAuthError] = useState("");
+  const [authNotice, setAuthNotice] = useState("");
 
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [workspaceId, setWorkspaceId] = useState("");
@@ -286,28 +289,55 @@ export function Dashboard({ initialEmail }: { initialEmail: string | null }) {
     if (!supabase) return;
     setAuthBusy(true);
     setAuthError("");
-    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-    if (signInError) setAuthError(signInError.message);
-    setAuthBusy(false);
+    setAuthNotice("");
+    const normalizedEmail = email.trim().toLowerCase();
+    setEmail(normalizedEmail);
+    try {
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: normalizedEmail,
+        password,
+      });
+      if (signInError) setAuthError(signInError.message);
+    } catch (reason) {
+      setAuthError(reason instanceof Error ? reason.message : "Sign in failed. Please try again.");
+    } finally {
+      setAuthBusy(false);
+    }
   }
 
-  async function signUp() {
+  async function signUp(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     if (!supabase) return;
+    const name = displayName.trim().replace(/\\s+/g, " ");
+    const normalizedEmail = email.trim().toLowerCase();
+    if (name.length < 2) {
+      setAuthError("Enter your name (at least 2 characters).");
+      return;
+    }
     setAuthBusy(true);
     setAuthError("");
+    setAuthNotice("");
+    setEmail(normalizedEmail);
     try {
-      const { error: signUpError } = await supabase.auth.signUp({
-        email: email.trim(),
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email: normalizedEmail,
         password,
         options: {
+          data: { full_name: name, name },
           emailRedirectTo: `${window.location.origin}/auth/callback?next=/`,
         },
       });
-      setAuthError(
-        signUpError
-          ? signUpError.message
-          : "Account created. Check your email to confirm it, then sign in here.",
-      );
+      if (signUpError) {
+        setAuthError(signUpError.message);
+      } else if (!data.session && data.user && data.user.identities?.length === 0) {
+        setAuthError("An account may already exist with this email. Sign in instead or use Forgot password.");
+        setAuthMode("signin");
+      } else if (!data.session) {
+        setAuthNotice("Account created. Confirm your email using the link we sent, then sign in with this same email and password.");
+        setAuthMode("signin");
+      } else {
+        setAuthNotice("Your account is ready.");
+      }
     } catch (reason) {
       setAuthError(reason instanceof Error ? reason.message : "Account creation failed.");
     } finally {
@@ -799,20 +829,23 @@ export function Dashboard({ initialEmail }: { initialEmail: string | null }) {
   }
 
   if (!session) {
+    const submittingSignup = authMode === "signup";
     return (
       <main className="auth-shell">
         <section className="auth-card">
           <div className="brand-mark">C</div>
           <p className="eyebrow">CHARVI / OWNER CONSOLE</p>
-          <h1>Your AI workforce, in one place.</h1>
-          <p className="muted">Sign in to manage your agents, saved memories, approvals and tasks.</p>
-          <form className="stack" onSubmit={signIn}>
+          <h1>{submittingSignup ? "Create your Charvi account." : "Your AI workforce, in one place."}</h1>
+          <p className="muted">{submittingSignup ? "Start with your name, email and a password. Your name will appear in your workspace." : "Sign in to manage your agents, saved memories, approvals and tasks."}</p>
+          <form className="stack" onSubmit={submittingSignup ? signUp : signIn}>
+            {submittingSignup && <label>Full name<input type="text" autoComplete="name" minLength={2} maxLength={100} required value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="Your name" /></label>}
             <label>Email<input type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} /></label>
-            <label>Password<input type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} /></label>
-            {authError && <p className="error">{authError}</p>}
-            <button className="primary" disabled={authBusy}>{authBusy ? "Please wait…" : "Sign in"}</button>
-            <button className="text-button" type="button" disabled={authBusy} onClick={() => { window.location.href = "/reset-password"; }}>Forgot password?</button>
-            <button className="quiet" type="button" disabled={authBusy} onClick={signUp}>Create account</button>
+            <label>Password<input type="password" autoComplete={submittingSignup ? "new-password" : "current-password"} minLength={8} required value={password} onChange={(event) => setPassword(event.target.value)} /></label>
+            {authError && <p className="error" role="alert">{authError}</p>}
+            {authNotice && <p className="notice-box" role="status">{authNotice}</p>}
+            <button className="primary" disabled={authBusy}>{authBusy ? "Please wait…" : submittingSignup ? "Create account" : "Sign in"}</button>
+            {!submittingSignup && <button className="text-button" type="button" disabled={authBusy} onClick={() => { window.location.href = "/reset-password"; }}>Forgot password?</button>}
+            <button className="quiet" type="button" disabled={authBusy} onClick={() => { setAuthError(""); setAuthNotice(""); setAuthMode(submittingSignup ? "signin" : "signup"); }}>{submittingSignup ? "Already have an account? Sign in" : "New to Charvi? Create account"}</button>
           </form>
         </section>
       </main>
@@ -839,7 +872,7 @@ export function Dashboard({ initialEmail }: { initialEmail: string | null }) {
 
       <section className="main-panel">
         <header className="topbar">
-          <div><p className="eyebrow">PERSONAL AI OPERATING SYSTEM</p><h1>Good to see you.</h1></div>
+          <div><p className="eyebrow">PERSONAL AI OPERATING SYSTEM</p><h1>Good to see you{typeof session.user.user_metadata?.full_name === "string" ? `, ${session.user.user_metadata.full_name.split(" ")[0]}` : ""}.</h1></div>
           <div className="top-actions">
             <select aria-label="Workspace" value={workspaceId} onChange={(event) => setWorkspaceId(event.target.value)}>
               {workspaces.map((workspace) => <option key={workspace.id} value={workspace.id}>{workspace.name}</option>)}
