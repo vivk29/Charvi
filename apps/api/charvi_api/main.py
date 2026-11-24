@@ -823,7 +823,7 @@ async def run_agent_task(
             )
 
     knowledge_records: list[dict[str, object]] = []
-    knowledge_query = " ".join(re.findall(r"[^\\W_]+", payload.task, flags=re.UNICODE)[:20])[:200]
+    knowledge_query = " ".join(re.findall(r"[^\W_]+", payload.task, flags=re.UNICODE)[:20])[:200]
     if payload.approval_id is None and len(knowledge_query) >= 2:
         knowledge_records = await store.search_knowledge_chunks(
             str(payload.workspace_id), knowledge_query, limit=5,
