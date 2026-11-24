@@ -1,6 +1,4 @@
 """File type validation helpers for Charvi's private knowledge vault."""
-from __future__ import annotations
-
 import dataclasses
 import io
 import zipfile
