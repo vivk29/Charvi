@@ -5,7 +5,7 @@ import csv
 import io
 import json
 import re
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from hashlib import sha256
 from typing import Any
 
@@ -98,9 +98,8 @@ def extract_document(extension: str, content: bytes) -> list[ExtractedUnit]:
         for slide_number, slide in enumerate(presentation.slides, start=1):
             parts: list[str] = []
             for shape in slide.shapes:
-                if getattr(shape, "has_text_frame", False):
-                    if shape.text.strip():
-                        parts.append(shape.text)
+                if getattr(shape, "has_text_frame", False) and shape.text.strip():
+                    parts.append(shape.text)
                 if getattr(shape, "has_table", False):
                     for row in shape.table.rows:
                         parts.append(" | ".join(cell.text for cell in row.cells))
