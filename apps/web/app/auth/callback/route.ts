@@ -29,7 +29,10 @@ export async function GET(request: NextRequest) {
   }
 
   if (!destination.searchParams.has("auth")) {
-    destination.searchParams.set("auth", "confirmed");
+    destination.searchParams.set(
+      "auth",
+      nextPath.startsWith("/reset-password") ? "recovery" : "confirmed",
+    );
   }
   return NextResponse.redirect(destination);
 }
