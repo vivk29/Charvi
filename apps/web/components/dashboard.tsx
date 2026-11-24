@@ -40,6 +40,7 @@ type Run = {
 };
 type KnowledgeFile = { id: string; original_name: string; mime_type: string; size_bytes: number; department?: string | null; status: string; extraction_summary?: string | null; created_at: string };
 type KnowledgeChunk = { id: string; chunk_index: number; content: string; locator_type: string; locator: Record<string, unknown> };
+type KnowledgeSearchResult = KnowledgeChunk & { knowledge_file_id: string };
 type Approval = {
   id: string;
   title: string;
@@ -126,7 +127,7 @@ export function Dashboard({ initialEmail }: { initialEmail: string | null }) {
   const [uploadDepartment, setUploadDepartment] = useState("");
   const [extractingFileId, setExtractingFileId] = useState("");
   const [selectedKnowledgeFile, setSelectedKnowledgeFile] = useState("");
-  const [knowledgeChunks, setKnowledgeChunks] = useState<KnowledgeChunk[]>([]);
+  const [knowledgeChunks, setKnowledgeChunks] = useState<KnowledgeChunk[]>([]);\n  const [knowledgeQuery, setKnowledgeQuery] = useState("");\n  const [knowledgeResults, setKnowledgeResults] = useState<KnowledgeSearchResult[]>([]);\n  const [knowledgeSearchBusy, setKnowledgeSearchBusy] = useState(false);
   const [dataBusy, setDataBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -403,6 +404,24 @@ export function Dashboard({ initialEmail }: { initialEmail: string | null }) {
       setKnowledgeChunks(chunks);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not load extracted text.");
+    }
+  }
+
+  async function searchKnowledge(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!token || !workspaceId || knowledgeQuery.trim().length < 2) return;
+    setKnowledgeSearchBusy(true);
+    setError("");
+    try {
+      const results = await apiRequest<KnowledgeSearchResult[]>(
+        `/v1/workspaces/${workspaceId}/knowledge-search?q=${encodeURIComponent(knowledgeQuery.trim())}&limit=30`, token,
+      );
+      setKnowledgeResults(results);
+      if (results.length === 0) setNotice("No matching extracted text found in this workspace.");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Knowledge search failed.");
+    } finally {
+      setKnowledgeSearchBusy(false);
     }
   }
 
