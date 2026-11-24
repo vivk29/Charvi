@@ -26,8 +26,8 @@ from pydantic import BaseModel, Field
 from .agents import AgentSettings
 from .auth import UserIdentity, get_current_user
 from .gateway import GatewayRequest, authorize_gateway_request, payload_digest
-from .knowledge import MAX_FILE_BYTES, validate_file
 from .document_parser import chunk_units, extract_document
+from .knowledge import MAX_FILE_BYTES, validate_file
 from .memory import (
     build_memory_context,
     is_safe_memory_content,
