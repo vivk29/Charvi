@@ -127,7 +127,10 @@ export function Dashboard({ initialEmail }: { initialEmail: string | null }) {
   const [uploadDepartment, setUploadDepartment] = useState("");
   const [extractingFileId, setExtractingFileId] = useState("");
   const [selectedKnowledgeFile, setSelectedKnowledgeFile] = useState("");
-  const [knowledgeChunks, setKnowledgeChunks] = useState<KnowledgeChunk[]>([]);\n  const [knowledgeQuery, setKnowledgeQuery] = useState("");\n  const [knowledgeResults, setKnowledgeResults] = useState<KnowledgeSearchResult[]>([]);\n  const [knowledgeSearchBusy, setKnowledgeSearchBusy] = useState(false);
+  const [knowledgeChunks, setKnowledgeChunks] = useState<KnowledgeChunk[]>([]);
+  const [knowledgeQuery, setKnowledgeQuery] = useState("");
+  const [knowledgeResults, setKnowledgeResults] = useState<KnowledgeSearchResult[]>([]);
+  const [knowledgeSearchBusy, setKnowledgeSearchBusy] = useState(false);
   const [dataBusy, setDataBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
