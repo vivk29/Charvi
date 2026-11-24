@@ -27,6 +27,7 @@ from .agents import AgentSettings
 from .auth import UserIdentity, get_current_user
 from .gateway import GatewayRequest, authorize_gateway_request, payload_digest
 from .knowledge import MAX_FILE_BYTES, validate_file
+from .document_parser import chunk_units, extract_document
 from .memory import (
     build_memory_context,
     is_safe_memory_content,
@@ -684,6 +685,71 @@ def format_orchestration_result(result) -> dict[str, object]:
         "device_control_performed": None if openclaw_invoked else False,
         "external_side_effects_performed": None if openclaw_invoked else False,
     }
+
+
+
+@app.post("/v1/workspaces/{workspace_id}/knowledge-files/{file_id}/extract", tags=["knowledge"])
+async def extract_knowledge_file(
+    workspace_id: UUID, file_id: UUID, user: CurrentUser, store: Store,
+) -> dict[str, object]:
+    """Extract text into provenance-aware chunks; never execute document content."""
+    await owned_workspace(store, workspace_id, user)
+    record = await store.get_knowledge_file(str(file_id), str(workspace_id))
+    if record is None:
+        raise HTTPException(status_code=404, detail="Knowledge file not found.")
+    if record.get("status") == "processing":
+        raise HTTPException(status_code=409, detail="This file is already being processed.")
+    await store.update_knowledge_file(
+        str(file_id), str(workspace_id),
+        {"status": "processing", "extraction_error": None, "updated_at": datetime.now(UTC).isoformat()},
+    )
+    try:
+        original = await store.download_knowledge_object(record["storage_path"])
+        units = extract_document(record["extension"], original)
+        chunks = chunk_units(units)
+        if not chunks:
+            raise ValueError("No readable text was found. This may be a scanned or image-only document.")
+        await store.replace_knowledge_chunks(str(file_id), str(workspace_id), chunks)
+        page_count = max((int(unit.locator.get("page", 0)) for unit in units
+                          if unit.locator_type == "page"), default=0)
+        sheet_count = len({unit.locator.get("sheet") for unit in units
+                           if unit.locator_type == "spreadsheet_row"})
+        summary = f"Extracted {len(units)} source units into {len(chunks)} searchable chunks."
+        await store.update_knowledge_file(
+            str(file_id), str(workspace_id),
+            {"status": "ready", "extraction_summary": summary, "page_count": page_count or None,
+             "sheet_count": sheet_count or None, "extraction_error": None,
+             "updated_at": datetime.now(UTC).isoformat()},
+        )
+        return {"file_id": str(file_id), "status": "ready", "source_units": len(units),
+                "chunks_created": len(chunks), "page_count": page_count, "sheet_count": sheet_count,
+                "summary": summary,
+                "note": "Document content is treated as untrusted data, never as executable instructions."}
+    except (ValueError, UnicodeDecodeError) as exc:
+        await store.update_knowledge_file(
+            str(file_id), str(workspace_id),
+            {"status": "needs_review", "extraction_error": str(exc)[:1000],
+             "updated_at": datetime.now(UTC).isoformat()},
+        )
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception:
+        await store.update_knowledge_file(
+            str(file_id), str(workspace_id),
+            {"status": "failed", "extraction_error": "Extraction failed.",
+             "updated_at": datetime.now(UTC).isoformat()},
+        )
+        raise
+
+
+@app.get("/v1/workspaces/{workspace_id}/knowledge-files/{file_id}/chunks", tags=["knowledge"])
+async def list_knowledge_file_chunks(
+    workspace_id: UUID, file_id: UUID, user: CurrentUser, store: Store,
+) -> list[dict[str, object]]:
+    await owned_workspace(store, workspace_id, user)
+    record = await store.get_knowledge_file(str(file_id), str(workspace_id))
+    if record is None:
+        raise HTTPException(status_code=404, detail="Knowledge file not found.")
+    return await store.list_knowledge_chunks(str(file_id), str(workspace_id))
 
 
 @app.post("/v1/agent-runs", tags=["agents"])
