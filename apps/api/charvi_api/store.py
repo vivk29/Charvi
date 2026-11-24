@@ -305,5 +305,62 @@ class SupabaseRestStore:
         )
 
 
+    async def upload_knowledge_object(self, path: str, content: bytes, mime_type: str) -> None:
+        if not self.settings.supabase_url or not self.settings.supabase_service_role_key:
+            raise HTTPException(status_code=503, detail="Charvi's private storage is not configured.")
+        url = f"{self.settings.supabase_url.rstrip('/')}/storage/v1/object/charvi-knowledge/{quote(path, safe='/')}"
+        headers = {
+            "apikey": self.settings.supabase_service_role_key,
+            "Authorization": f"Bearer {self.settings.supabase_service_role_key}",
+            "Content-Type": mime_type,
+            "x-upsert": "false",
+            "Cache-Control": "private, max-age=0",
+        }
+        try:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(45.0)) as client:
+                response = await client.post(url, content=content, headers=headers)
+        except httpx.HTTPError as exc:
+            raise HTTPException(status_code=503, detail="Private file storage is unavailable.") from exc
+        if response.status_code >= 400:
+            raise HTTPException(status_code=502, detail="Private file storage rejected the upload.")
+
+    async def delete_knowledge_object(self, path: str) -> None:
+        if not self.settings.supabase_url or not self.settings.supabase_service_role_key:
+            return
+        url = f"{self.settings.supabase_url.rstrip('/')}/storage/v1/object/charvi-knowledge/{quote(path, safe='/')}"
+        headers = {
+            "apikey": self.settings.supabase_service_role_key,
+            "Authorization": f"Bearer {self.settings.supabase_service_role_key}",
+        }
+        try:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(15.0)) as client:
+                await client.delete(url, headers=headers)
+        except httpx.HTTPError:
+            # Orphan cleanup is best-effort; the failed metadata write remains visible to operators.
+            return
+
+    async def create_knowledge_file(self, record: dict[str, Any]) -> dict[str, Any]:
+        rows = await self._request(
+            "POST", "knowledge_files",
+            params={"select": "id,workspace_id,original_name,mime_type,extension,size_bytes,sha256,department,status,created_at"},
+            body=record,
+            prefer="return=representation",
+        )
+        if not rows:
+            raise HTTPException(status_code=502, detail="File metadata was not saved.")
+        return rows[0]
+
+    async def list_knowledge_files(self, workspace_id: str) -> list[dict[str, Any]]:
+        return await self._request(
+            "GET", "knowledge_files",
+            params={
+                "select": "id,workspace_id,original_name,mime_type,extension,size_bytes,sha256,department,status,extraction_summary,page_count,sheet_count,extraction_error,created_at,updated_at",
+                "workspace_id": f"eq.{workspace_id}",
+                "order": "created_at.desc",
+                "limit": "100",
+            },
+        )
+
+
 def get_store() -> SupabaseRestStore:
     return SupabaseRestStore()
