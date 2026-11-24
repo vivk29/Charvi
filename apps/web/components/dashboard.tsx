@@ -38,6 +38,7 @@ type Run = {
   error_summary?: string;
   created_at: string;
 };
+type KnowledgeFile = { id: string; original_name: string; mime_type: string; size_bytes: number; department?: string | null; status: string; created_at: string };
 type Approval = {
   id: string;
   title: string;
@@ -119,6 +120,9 @@ export function Dashboard({ initialEmail }: { initialEmail: string | null }) {
   const [memories, setMemories] = useState<Memory[]>([]);
   const [runs, setRuns] = useState<Run[]>([]);
   const [approvals, setApprovals] = useState<Approval[]>([]);
+  const [knowledgeFiles, setKnowledgeFiles] = useState<KnowledgeFile[]>([]);
+  const [uploadBusy, setUploadBusy] = useState(false);
+  const [uploadDepartment, setUploadDepartment] = useState("");
   const [dataBusy, setDataBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -228,6 +232,7 @@ export function Dashboard({ initialEmail }: { initialEmail: string | null }) {
       apiRequest<Memory[]>(`/v1/workspaces/${id}/memories`, accessToken),
       apiRequest<Run[]>(`/v1/workspaces/${id}/agent-runs`, accessToken),
       apiRequest<Approval[]>(`/v1/workspaces/${id}/approvals?status=pending`, accessToken),
+      apiRequest<KnowledgeFile[]>(`/v1/workspaces/${id}/knowledge-files`, accessToken),
     ]);
 
     if (results[0].status === "fulfilled") setAgents(results[0].value);
@@ -235,6 +240,7 @@ export function Dashboard({ initialEmail }: { initialEmail: string | null }) {
     if (results[2].status === "fulfilled") setMemories(results[2].value);
     if (results[3].status === "fulfilled") setRuns(results[3].value);
     if (results[4].status === "fulfilled") setApprovals(results[4].value);
+    if (results[5].status === "fulfilled") setKnowledgeFiles(results[5].value);
 
     const failed = results.find((result) => result.status === "rejected");
     if (failed?.status === "rejected") {
@@ -354,6 +360,43 @@ export function Dashboard({ initialEmail }: { initialEmail: string | null }) {
       setError(reason instanceof Error ? reason.message : "The task could not be started.");
     } finally {
       setTaskBusy(false);
+    }
+  }
+
+
+  async function uploadKnowledgeFiles(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const input = event.currentTarget.elements.namedItem("knowledgeFiles");
+    if (!(input instanceof HTMLInputElement) || !input.files?.length || !token || !workspaceId) return;
+    setUploadBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      for (const file of Array.from(input.files)) {
+        const form = new FormData();
+        form.append("file", file);
+        if (uploadDepartment) form.append("department", uploadDepartment);
+        const response = await fetch(`${API_BASE}/v1/workspaces/${workspaceId}/knowledge-files`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+          body: form,
+          cache: "no-store",
+        });
+        const result: unknown = await response.json().catch(() => null);
+        if (!response.ok) {
+          const detail = typeof result === "object" && result !== null && "detail" in result
+            ? String((result as { detail: unknown }).detail)
+            : `Upload failed (${response.status})`;
+          throw new Error(`${file.name}: ${detail}`);
+        }
+      }
+      input.value = "";
+      setNotice("Upload complete. Files are stored privately; extraction is the next pipeline stage.");
+      await refreshWorkspaceData(token, workspaceId);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "One or more files could not be uploaded.");
+    } finally {
+      setUploadBusy(false);
     }
   }
 
@@ -719,7 +762,7 @@ export function Dashboard({ initialEmail }: { initialEmail: string | null }) {
         <nav>
           <a href="#overview" className="nav-active">Overview</a>
           <a href="#workforce">Workforce</a>
-          <a href="#run-task">Run a task</a>
+          <a href="#knowledge">Knowledge Hub</a><a href="#run-task">Run a task</a>
           <a href="#memories">Memory vault</a>
           <a href="#approvals">Approvals <span className="nav-count">{approvals.length}</span></a>
           <a href="#activity">Activity</a>
@@ -779,6 +822,31 @@ export function Dashboard({ initialEmail }: { initialEmail: string | null }) {
                   </article>
                 ))}
                 {agents.length === 0 && <p className="muted">Agent registry is not connected yet.</p>}
+              </div>
+            </section>
+
+
+            <section id="knowledge" className="section-block">
+              <div className="section-heading"><div><p className="eyebrow">PRIVATE DOCUMENT VAULT</p><h2>Knowledge Hub</h2></div><span className="status neutral">15 MB per file</span></div>
+              <form className="panel stack" onSubmit={uploadKnowledgeFiles}>
+                <label>Choose documents, spreadsheets, presentations or images
+                  <input name="knowledgeFiles" type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.ppt,.pptx,.txt,.jpg,.jpeg,.png,.webp" />
+                </label>
+                <label>Department
+                  <select value={uploadDepartment} onChange={(event) => setUploadDepartment(event.target.value)}>
+                    <option value="">Unassigned — let Charvi classify later</option>
+                    <option>Finance &amp; Treasury</option><option>Accounting &amp; Tax</option><option>Sales &amp; Revenue</option><option>Marketing</option><option>Human Resources</option><option>Operations &amp; Supply Chain</option><option>Customer Support</option><option>Legal &amp; Compliance</option><option>Projects &amp; IT</option><option>Procurement &amp; Vendors</option><option>Strategy &amp; Executive Office</option>
+                  </select>
+                </label>
+                <div className="form-row"><p className="muted tiny">PDF, Office files, CSV, TXT, JPG, PNG and WEBP. File signature is checked; browser MIME headers are not trusted.</p><button className="primary" disabled={uploadBusy}>{uploadBusy ? "Uploading…" : "Upload privately"}</button></div>
+              </form>
+              <div className="run-list">
+                {knowledgeFiles.map((file) => <article className="run-card" key={file.id}>
+                  <div className="card-top"><strong>{file.original_name}</strong><span className={statusClass(file.status === "ready" ? "completed" : file.status === "failed" ? "failed" : null)}>{file.status}</span></div>
+                  <small className="muted">{file.department || "Unassigned"} · {(file.size_bytes / 1024 / 1024).toFixed(2)} MB · {formatDate(file.created_at)}</small>
+                  <small className="muted">Stored privately · extraction not yet enabled</small>
+                </article>)}
+                {knowledgeFiles.length === 0 && <p className="muted">No files uploaded to this workspace yet.</p>}
               </div>
             </section>
 
