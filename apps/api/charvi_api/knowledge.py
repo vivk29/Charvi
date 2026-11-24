@@ -40,7 +40,7 @@ def validate_file(filename: str, content: bytes) -> ValidatedFile:
         raise ValueError("The file is empty.")
     if len(content) > MAX_FILE_BYTES:
         raise ValueError("Files must be 15 MB or smaller.")
-    if not filename or len(filename) > 255 or "/" in filename or "\\\\" in filename:
+    if not filename or len(filename) > 255 or "/" in filename or "\\" in filename:
         raise ValueError("Invalid filename.")
 
     extension = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
@@ -51,9 +51,9 @@ def validate_file(filename: str, content: bytes) -> ValidatedFile:
     if extension == "pdf":
         valid = content.startswith(b"%PDF-")
     elif extension in {"jpg", "jpeg"}:
-        valid = content.startswith(b"\\xff\\xd8\\xff")
+        valid = content.startswith(b"\xff\xd8\xff")
     elif extension == "png":
-        valid = content.startswith(b"\\x89PNG\\r\\n\\x1a\\n")
+        valid = content.startswith(b"\x89PNG\r\n\x1a\n")
     elif extension == "webp":
         valid = len(content) >= 12 and content[:4] == b"RIFF" and content[8:12] == b"WEBP"
     elif extension in {"doc", "xls", "ppt"}:
@@ -70,7 +70,7 @@ def validate_file(filename: str, content: bytes) -> ValidatedFile:
     elif extension in {"csv", "txt"}:
         try:
             decoded = content.decode("utf-8-sig")
-            valid = "\\x00" not in decoded
+            valid = "\x00" not in decoded
         except UnicodeDecodeError:
             valid = False
 
