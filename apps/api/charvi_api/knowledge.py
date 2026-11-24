@@ -1,4 +1,5 @@
 """File type validation helpers for Charvi's private knowledge vault."""
+# ruff: noqa: I001
 
 import dataclasses
 import io
