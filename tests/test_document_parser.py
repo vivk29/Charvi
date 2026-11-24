@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-import csv
 import io
-from pptx import Presentation
+import pytest
 from docx import Document
 from openpyxl import Workbook
-import pytest
+from pptx import Presentation
 
 from charvi_api.document_parser import chunk_units, extract_document
 
