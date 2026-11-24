@@ -1,15 +1,15 @@
 """File type validation helpers for Charvi's private knowledge vault."""
 from __future__ import annotations
 
+import dataclasses
 import io
 import zipfile
-from dataclasses import dataclass
 
 
 MAX_FILE_BYTES = 15 * 1024 * 1024
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True)
 class ValidatedFile:
     extension: str
     mime_type: str
