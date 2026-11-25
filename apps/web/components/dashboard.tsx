@@ -1067,6 +1067,13 @@ export function Dashboard({ initialEmail }: { initialEmail: string | null }) {
         {history.length > 0 && <section className="history-drawer"><div className="card-top"><strong>Thread history</strong><button className="text-button" onClick={() => setHistory([])}>Close</button></div><p className="muted tiny">{historyTitle}</p>{history.map((message, index) => <div className="history-message" key={index}><strong>{message.role}</strong><p>{message.content}</p></div>)}</section>}
         <footer className="footer-note">Charvi Control Plane · Your data stays in your Supabase workspace. Live data is distinguished from planned capabilities.</footer>
       </section>
+      <aside className="assistant-rail">
+        <div className="assistant-rail-head"><div className="row"><div className="assistant-orb">च</div><div><strong>Charvi</strong><p className="muted tiny">AI operating assistant</p></div></div><span className={statusClass(model?.configured)}>{model?.configured?"Ready":"Setup"}</span></div>
+        <div className="panel stack"><h3>Workspace context</h3><p className="muted tiny">{workspaces.find(w=>w.id===workspaceId)?.name||"No workspace selected"}</p><div className="row"><span className="muted tiny">Agents</span><strong>{agents.length}</strong></div><div className="row"><span className="muted tiny">Knowledge files</span><strong>{knowledgeFiles.length}</strong></div><div className="row"><span className="muted tiny">Pending approvals</span><strong>{approvals.length}</strong></div></div>
+        <div className="panel stack"><h3>Ask Charvi</h3><p className="muted tiny">Tasks use workspace permissions and relevant saved knowledge. External actions require approval.</p><form className="stack" onSubmit={submitTask}><textarea aria-label="Ask Charvi a task" value={task} onChange={(event)=>setTask(event.target.value)} rows={5} placeholder="Give Charvi a task…"/><label className="check-label"><input type="checkbox" checked={useMemory} onChange={(event)=>setUseMemory(event.target.checked)}/> Use saved memory</label><button className="primary" disabled={taskBusy||!task.trim()}>{taskBusy?"Working…":"Send task ↑"}</button></form></div>
+        {lastResult&&<div className="panel stack"><div className="card-top"><strong>Latest run</strong><span className={statusClass(lastResult.status)}>{lastResult.status}</span></div><p className="muted tiny">{lastResult.coordinator?.output||lastResult.coordinator?.error||"No response text returned."}</p></div>}
+        <p className="muted tiny">Charvi never marks a connector live until its readiness is reported.</p>
+      </aside>
     </main>
   );
 }
