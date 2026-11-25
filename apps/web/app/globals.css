@@ -145,3 +145,29 @@ button.text-button { background: transparent; border: 0; padding: 4px; color: va
 @media(max-width:1180px){.app-shell{grid-template-columns:210px minmax(0,1fr)}.assistant-rail{display:none}}
 @media(max-width:980px){.app-shell{grid-template-columns:190px minmax(0,1fr)}}
 @media(max-width:700px){.app-shell{display:block}.sidebar{position:static;height:auto;overflow:visible}.sidebar nav{display:flex;overflow-x:auto;gap:8px}.nav-group{display:flex;align-items:center;gap:4px;white-space:nowrap}.nav-group small{display:none}.sidebar nav a{white-space:nowrap}.coverage-grid,.feature-grid{grid-template-columns:1fr}.status-bar-row{grid-template-columns:80px 1fr 22px}}
+
+/* Four-option primary navigation with meaningful expandable destinations */
+.sidebar nav.nav-four{display:grid;gap:8px}
+.nav-four .nav-group{display:block;border:1px solid transparent;border-radius:12px;overflow:visible}
+.nav-four .nav-group[open]{background:var(--surface-2);border-color:var(--line);padding-bottom:5px}
+.nav-four .nav-group summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:11px;padding:12px;border-radius:11px;color:var(--text);font-size:14px;font-weight:750}
+.nav-four .nav-group summary::-webkit-details-marker{display:none}
+.nav-four .nav-symbol{width:23px;height:23px;display:grid;place-items:center;color:var(--accent-strong);font-size:19px}
+.nav-four .nav-chevron{margin-left:auto;color:var(--muted);transition:transform .15s ease}
+.nav-four .nav-group[open] .nav-chevron{transform:rotate(180deg)}
+.nav-four .nav-group>a{display:flex;align-items:center;gap:8px;margin:1px 8px 1px 43px;padding:8px 9px;color:var(--muted);font-size:12px;border-radius:8px}
+.nav-four .nav-group>a:hover{background:var(--bg);color:var(--text)}
+.nav-four .nav-group>a span{flex:1}
+@media(max-width:700px){
+ .sidebar nav.nav-four{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));overflow:visible;gap:5px}
+ .nav-four .nav-group{position:relative;min-width:0}
+ .nav-four .nav-group summary{justify-content:center;gap:5px;padding:10px 4px;font-size:12px;flex-wrap:wrap}
+ .nav-four .nav-symbol{width:100%;font-size:18px}
+ .nav-four .nav-chevron{margin-left:0;font-size:10px}
+ .nav-four .nav-group>a{position:relative;margin:0 6px;padding:9px 8px;font-size:12px}
+ .nav-four .nav-group[open]{grid-column:span 4}
+ .nav-four .nav-group[open] summary{justify-content:flex-start;padding:9px 12px}
+ .nav-four .nav-group[open] .nav-symbol{width:23px}
+ .nav-four .nav-group[open] .nav-chevron{margin-left:auto}
+ .nav-four .nav-group:not([open])>a{display:none}
+}
