@@ -856,11 +856,35 @@ export function Dashboard({ initialEmail }: { initialEmail: string | null }) {
     <main className="app-shell">
       <aside className="sidebar">
         <div className="brand-row"><div className="brand-mark small">C</div><div><strong>CHARVI</strong><span>AI WORKSPACE</span></div></div>
-        <nav className="nav-groups">
-          <div className="nav-group"><small>WORK</small><a href="#overview">◈ <span>Command Centre</span></a><a href="#charvi-assistant">✦ <span>Charvi AI</span></a><a href="#departments">▦ <span>Departments</span></a><a href="#knowledge">▤ <span>Knowledge Hub</span></a><a href="#analytics">◔ <span>Analytics</span></a></div>
-          <div className="nav-group"><small>WORKFORCE</small><a href="#workforce">☻ <span>Agents &amp; Workforce</span></a><a href="#tasks-projects">☑ <span>Tasks &amp; Projects</span></a><a href="#automations">↻ <span>Automations</span></a><a href="#approvals">✓ <span>Approvals</span><b className="nav-count">{approvals.length}</b></a></div>
-          <div className="nav-group"><small>CONNECTED</small><a href="#devices">▭ <span>Devices</span></a><a href="#integrations">⌁ <span>Integrations</span></a><a href="#memories">◉ <span>Memory</span></a></div>
-          <div className="nav-group"><small>RECORDS</small><a href="#reports">▤ <span>Reports</span></a><a href="#activity">≡ <span>Activity Centre</span></a><a href="#settings">⚙ <span>Settings</span></a><a href="#design-coverage">☰ <span>Design coverage</span></a></div>
+        <nav className="nav-groups nav-four">
+          <details className="nav-group" open>
+            <summary><span className="nav-symbol">⌂</span><span>Home</span><span className="nav-chevron">⌄</span></summary>
+            <a href="#overview"><span>Command Centre</span></a>
+            <a href="#charvi-assistant"><span>Charvi AI</span></a>
+            <a href="#analytics"><span>Analytics</span></a>
+            <a href="#reports"><span>Reports</span></a>
+            <a href="#activity"><span>Activity Centre</span></a>
+          </details>
+          <details className="nav-group">
+            <summary><span className="nav-symbol">▦</span><span>Work</span><span className="nav-chevron">⌄</span></summary>
+            <a href="#workforce"><span>Agents &amp; Workforce</span></a>
+            <a href="#departments"><span>Departments</span></a>
+            <a href="#tasks-projects"><span>Tasks &amp; Projects</span></a>
+            <a href="#automations"><span>Automations</span></a>
+          </details>
+          <details className="nav-group">
+            <summary><span className="nav-symbol">▤</span><span>Knowledge</span><span className="nav-chevron">⌄</span></summary>
+            <a href="#knowledge"><span>Knowledge Hub</span></a>
+            <a href="#memories"><span>Memory Vault</span></a>
+          </details>
+          <details className="nav-group">
+            <summary><span className="nav-symbol">⚙</span><span>Control</span><span className="nav-chevron">⌄</span></summary>
+            <a href="#approvals"><span>Approvals</span><b className="nav-count">{approvals.length}</b></a>
+            <a href="#integrations"><span>Integrations</span></a>
+            <a href="#devices"><span>Devices</span></a>
+            <a href="#settings"><span>Settings &amp; Profile</span></a>
+            <a href="#design-coverage"><span>Screen coverage</span></a>
+          </details>
         </nav>
         <div className="sidebar-bottom">
           <span className="muted tiny">{session.user.email || initialEmail}</span>
