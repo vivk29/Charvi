@@ -375,6 +375,10 @@ export function Dashboard({ initialEmail }: { initialEmail: string | null }) {
   async function submitTask(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!token || !workspaceId || !task.trim()) return;
+    if (!model?.configured || model.reachable === false || model.model_available === false) {
+      setError("Charvi AI is not connected yet. Configure the coordinator provider in the charvi-api Vercel project before submitting tasks. See docs/CHARVI_AI_CONNECTION_BLOCKER.md.");
+      return;
+    }
     setTaskBusy(true);
     setError("");
     setNotice("");
@@ -1027,7 +1031,7 @@ export function Dashboard({ initialEmail }: { initialEmail: string | null }) {
                   <span className="muted tiny">{voiceStatus || "Browser speech recognition may use your browser or device speech provider."}</span>
                 </div>
 
-                <div className="form-row"><label className="check-label"><input type="checkbox" checked={useMemory} onChange={(event) => setUseMemory(event.target.checked)} /> Use relevant saved memories</label><button className="primary" disabled={taskBusy || !task.trim()}>{taskBusy ? "Working…" : "Send to Charvi"}</button></div>
+                <div className="form-row"><label className="check-label"><input type="checkbox" checked={useMemory} onChange={(event) => setUseMemory(event.target.checked)} /> Use relevant saved memories</label><button className="primary" disabled={taskBusy || !task.trim() || !model?.configured || model.reachable === false || model.model_available === false}>{taskBusy ? "Working…" : "Send to Charvi"}</button></div>
                 {threadId && <p className="muted tiny">Continuing thread: {threadId} <button className="text-button" type="button" onClick={() => setThreadId("")}>Start new thread</button></p>}
               </form>
               {lastResult && <article className="panel result-panel"><div className="card-top"><strong>Latest response</strong><span className={statusClass(lastResult.status)}>{lastResult.status}</span></div><p>{lastResult.coordinator?.output || lastResult.coordinator?.error || "No response text returned."}</p><div className="form-row"><small className="muted">Run {lastResult.run_id} · {lastResult.memories_used ?? 0} memories used</small>{lastResult.coordinator?.output && <button className="quiet" type="button" onClick={() => void speakLastResponse()}>Read response aloud</button>}</div></article>}
@@ -1094,7 +1098,7 @@ export function Dashboard({ initialEmail }: { initialEmail: string | null }) {
       <aside className="assistant-rail">
         <div className="assistant-rail-head"><div className="row"><div className="assistant-orb">च</div><div><strong>Charvi</strong><p className="muted tiny">AI operating assistant</p></div></div><span className={statusClass(model?.configured)}>{model?.configured?"Ready":"Setup"}</span></div>
         <div className="panel stack"><h3>Workspace context</h3><p className="muted tiny">{workspaces.find(w=>w.id===workspaceId)?.name||"No workspace selected"}</p><div className="row"><span className="muted tiny">Agents</span><strong>{agents.length}</strong></div><div className="row"><span className="muted tiny">Knowledge files</span><strong>{knowledgeFiles.length}</strong></div><div className="row"><span className="muted tiny">Pending approvals</span><strong>{approvals.length}</strong></div></div>
-        <div className="panel stack"><h3>Ask Charvi</h3><p className="muted tiny">Tasks use workspace permissions and relevant saved knowledge. External actions require approval.</p><form className="stack" onSubmit={submitTask}><textarea aria-label="Ask Charvi a task" value={task} onChange={(event)=>setTask(event.target.value)} rows={5} placeholder="Give Charvi a task…"/><label className="check-label"><input type="checkbox" checked={useMemory} onChange={(event)=>setUseMemory(event.target.checked)}/> Use saved memory</label><button className="primary" disabled={taskBusy||!task.trim()}>{taskBusy?"Working…":"Send task ↑"}</button></form></div>
+        <div className="panel stack"><h3>Ask Charvi</h3><p className="muted tiny">Tasks use workspace permissions and relevant saved knowledge. External actions require approval.</p><form className="stack" onSubmit={submitTask}><textarea aria-label="Ask Charvi a task" value={task} onChange={(event)=>setTask(event.target.value)} rows={5} placeholder="Give Charvi a task…"/><label className="check-label"><input type="checkbox" checked={useMemory} onChange={(event)=>setUseMemory(event.target.checked)}/> Use saved memory</label><button className="primary" disabled={taskBusy||!task.trim()||!model?.configured||model.reachable===false||model.model_available===false}>{taskBusy?"Working…":"Send task ↑"}</button></form></div>
         {lastResult&&<div className="panel stack"><div className="card-top"><strong>Latest run</strong><span className={statusClass(lastResult.status)}>{lastResult.status}</span></div><p className="muted tiny">{lastResult.coordinator?.output||lastResult.coordinator?.error||"No response text returned."}</p></div>}
         <p className="muted tiny">Charvi never marks a connector live until its readiness is reported.</p>
       </aside>
