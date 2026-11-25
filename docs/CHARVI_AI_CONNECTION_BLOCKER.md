@@ -4,7 +4,7 @@ Checked: 25 November 2026
 
 ## Finding
 
-The frontend Vercel project has the public frontend configuration variables, but the Vercel environment-variable listing for the separate `charvi-api` project returned an empty list (no custom variables).
+The separate `charvi-api` Vercel project initially had no custom environment variables. I have now added `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` from the already-configured frontend project to the API project for Production and Preview. The private database credential and model-provider credentials are still missing and must be supplied by the account owner.
 
 The API source requires these server-side variables:
 
