@@ -14,11 +14,11 @@ The API source requires these server-side variables:
 
 Without the first two, API bearer-token validation returns `Authentication is not configured.`. Without the service-role key, database operations return `Charvi's private database connection is not configured.`.
 
-The AI coordinator code exists, but it is not the same as a connected model. `AgentSettings.coordinator_provider` defaults to `ollama`. The default Ollama adapter requires `OLLAMA_BASE_URL` and `OLLAMA_MODEL`. No API-project custom environment variables were visible in the Vercel listing, so a model provider has not been configured there.
+The AI coordinator code exists, but it is not the same as a connected model. `AgentSettings.coordinator_provider` defaults to `ollama`. The default Ollama adapter requires `OLLAMA_BASE_URL` and `OLLAMA_MODEL`. No model-provider credentials were visible, so a model provider has not been configured there.
 
 ## Recommended connection: OpenAI API
 
-In Vercel, open the separate `charvi-api` project, then Settings → Environment Variables. Add these variables for Production (and Preview if you use previews):
+In Vercel, open the separate `charvi-api` project, then Settings → Environment Variables. `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` are already set for Production and Preview. Add the remaining variables:
 
 | Variable | Value |
 |---|---|
